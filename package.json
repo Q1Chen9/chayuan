@@ -1,0 +1,43 @@
+{
+  "name": "linye",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build-qiniu": "vite build && node ./qiniu.js",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@meruem117/vue-seamless-scroll": "^0.1.8",
+    "@vue/shared": "^3.2.47",
+    "autoprefixer": "^10.4.13",
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.7",
+    "disable-devtool": "^0.3.7",
+    "echarts": "^5.4.0",
+    "echarts-liquidfill": "3.1.0",
+    "echarts-wordcloud": "^2.1.0",
+    "element-plus": "^2.8.4",
+    "express": "^5.1.0",
+    "fs": "0.0.1-security",
+    "gsap": "^3.11.4",
+    "mysql2": "^3.14.2",
+    "postcss": "^8.4.21",
+    "postcss-loader": "^7.0.2",
+    "postcss-pxtorem": "^6.0.0",
+    "qiniu": "^7.8.0",
+    "sass": "1.79.4",
+    "sass-loader": "16.0.2",
+    "style-loader": "4.0.0",
+    "vite-plugin-compression": "^0.5.1",
+    "vue": "^3.2.45",
+    "vue-router": "^4.1.6",
+    "wow.js": "^1.2.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.0.0",
+    "vite": "^4.0.0"
+  }
+}
