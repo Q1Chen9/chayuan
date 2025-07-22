@@ -19,8 +19,8 @@
                 <span><i class="fas fa-location-dot"></i> {{ warning.area }}</span>
                 <span><i class="fas fa-clock"></i> {{ formatTime(warning.time) }}</span>
               </div>
-              <div class="warning-suggestion">
-                <i class="fas fa-lightbulb"></i> {{ warning.suggestion }}
+              <div class="warning-suggestion" @click="showFullSuggestion(warning.suggestion, $event)">
+                <i class="fas fa-lightbulb"></i> {{ stripMarkdown(warning.suggestion) }}
               </div>
             </li>
           </ul>
@@ -52,9 +52,16 @@
         <div class="card pest-distribution-chart-card">
           <div class="card-header">
             <i class="fas fa-chart-pie"></i>
-            <h3>病虫害种类分布</h3>
+            <h3>病虫害与茶叶分级分布</h3>
+            <div class="chart-totals">
+              <span>病虫害总数: {{ pestTotal }}</span>
+              <span>茶叶分级检测总数: {{ leafGradeTotal }}</span>
+            </div>
           </div>
-          <PestDistributionChart :chartData="pestDistribution" />
+          <div class="chart-row">
+            <PestDistributionChart :chartData="pestDistribution" />
+            <LeafGradeChart :chartData="leafGradeStats" />
+          </div>
         </div>
       </div>
 
@@ -73,15 +80,16 @@
             <h3>快速操作</h3>
           </div>
           <div class="action-buttons">
-            <button class="action-btn"><i class="fas fa-plus"></i> 新建监测任务</button>
-            <button class="action-btn"><i class="fas fa-file-export"></i> 导出预警报告</button>
-            <button class="action-btn"><i class="fas fa-bell"></i> 推送预警通知</button>
-            <button class="action-btn"><i class="fas fa-gear"></i> 管理预警规则</button>
+            <button class="action-btn" @click="newMonitoringTask"><i class="fas fa-plus"></i> 新建监测任务</button>
+            <button class="action-btn" @click="exportWarningReport"><i class="fas fa-file-export"></i> 导出预警报告</button>
+            <button class="action-btn" @click="pushWarningNotification"><i class="fas fa-bell"></i> 推送预警通知</button>
+            <button class="action-btn" @click="manageWarningRules"><i class="fas fa-gear"></i> 管理预警规则</button>
           </div>
         </div>
       </div>
     </div>
     <div class="footerbg wow fadeInUp"></div>
+    <Pop :show="showPopup" :content="popupContent" @close="showPopup = false" />
   </div>
 </template>
 
@@ -92,6 +100,8 @@ import top from "./components/top/index.vue";
 import PestDistributionChart from './components/prediction/PestDistributionChart.vue';
 import SeverityLevelChart from './components/prediction/SeverityLevelChart.vue';
 import DetectionTrendChart from './components/prediction/DetectionTrendChart.vue';
+import LeafGradeChart from './components/prediction/LeafGradeChart.vue';
+import Pop from '../components/pop/pop.vue';
 
 export default {
   name: 'Prediction',
@@ -100,12 +110,19 @@ export default {
     PestDistributionChart,
     SeverityLevelChart,
     DetectionTrendChart,
+    LeafGradeChart,
+    Pop,
   },
   setup() {
     const pestWarnings = ref([]);
     const userDetections = ref([]);
     const pestDistribution = ref([]);
     const severityStats = ref([]);
+    const leafGradeStats = ref([]);
+    const pestTotal = ref(0);
+    const leafGradeTotal = ref(0);
+    const showPopup = ref(false);
+    const popupContent = ref('');
     const detectionTrend = ref({
       labels: [],
       values: [],
@@ -120,20 +137,18 @@ export default {
         userDetections.value = userDetectionsRes.data;
 
         const pestDistributionRes = await axios.get('http://localhost:3000/api/pest-distribution');
-        pestDistribution.value = pestDistributionRes.data;
+        pestDistribution.value = pestDistributionRes.data.distribution;
+        pestTotal.value = pestDistributionRes.data.total;
 
         const severityStatsRes = await axios.get('http://localhost:3000/api/severity-stats');
         severityStats.value = severityStatsRes.data;
         
-        // Fetch data for the trend chart
-        // This is a placeholder and should be replaced with a real endpoint if available
-        const trendRes = await axios.get('http://localhost:3000/api/warnings');
-        const trendData = trendRes.data.slice(0, 7).reverse();
-        detectionTrend.value = {
-          labels: trendData.map(d => new Date(d.time).toLocaleDateString()),
-          values: trendData.map((_, i) => Math.floor(Math.random() * 200) + 50) // Placeholder values
-        };
+        const trendRes = await axios.get('http://localhost:3000/api/detection-trend');
+        detectionTrend.value = trendRes.data;
 
+        const leafGradeRes = await axios.get('http://localhost:3000/api/leaf-grade-stats');
+        leafGradeStats.value = leafGradeRes.data.stats;
+        leafGradeTotal.value = leafGradeRes.data.total;
 
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -163,6 +178,63 @@ export default {
       return date.toLocaleDateString();
     }
 
+    const showFullSuggestion = (suggestion, event) => {
+      popupContent.value = suggestion;
+      showPopup.value = true;
+    };
+
+    const stripMarkdown = (text) => {
+      if (!text) return '暂无建议';
+      return text
+        .replace(/#{1,4}\s?/g, '') // remove hash-based headers
+        .replace(/\*\*/g, '')      // remove bold
+        .replace(/\*/g, '')       // remove italic
+        .replace(/-\s/g, '')       // remove list dashes
+        .replace(/`/g, '')        // remove backticks
+        .replace(/\\n/g, ' ')     // replace escaped newlines with space
+        .replace(/\n/g, ' ');      // replace newlines with space
+    };
+
+    const newMonitoringTask = () => {
+      console.log('"新建监测任务" button clicked. Implementation pending.');
+      alert('“新建监测任务”功能正在开发中。');
+    };
+
+    const exportWarningReport = () => {
+      let reportContent = "实时预警报告\n\n";
+      reportContent += "========================================\n\n";
+      
+      pestWarnings.value.forEach(warning => {
+        reportContent += `预警名称: ${warning.name}\n`;
+        reportContent += `预警等级: ${warning.level}\n`;
+        reportContent += `发生区域: ${warning.area}\n`;
+        reportContent += `发生时间: ${warning.time}\n`;
+        reportContent += `处理建议: ${warning.suggestion}\n`;
+        reportContent += "----------------------------------------\n";
+      });
+
+      const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `预警报告-${new Date().toISOString().split('T')[0]}.txt`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    };
+
+    const pushWarningNotification = () => {
+      if (pestWarnings.value.length > 0) {
+        const latestWarning = pestWarnings.value[0];
+        alert(`新预警通知:\n\n名称: ${latestWarning.name}\n等级: ${latestWarning.level}\n区域: ${latestWarning.area}`);
+      } else {
+        alert("当前无新预警。");
+      }
+    };
+
+    const manageWarningRules = () => {
+      console.log('"管理预警规则" button clicked. Implementation pending.');
+      alert('“管理预警规则”功能正在开发中。');
+    };
+
 
     onMounted(() => {
       fetchData();
@@ -176,6 +248,17 @@ export default {
       detectionTrend,
       getWarningClass,
       formatTime,
+      leafGradeStats,
+      newMonitoringTask,
+      exportWarningReport,
+      pushWarningNotification,
+      manageWarningRules,
+      stripMarkdown,
+      showPopup,
+      popupContent,
+      showFullSuggestion,
+      pestTotal,
+      leafGradeTotal,
     };
   }
 }
@@ -241,8 +324,16 @@ export default {
       font-weight: 600;
       margin: 0;
       color: #d5f1f8;
+      flex-grow: 1;
     }
   }
+}
+
+.chart-totals {
+  display: flex;
+  gap: 20px;
+  font-size: 14px;
+  color: #aaccdd;
 }
 
 .warning-list-card, .user-ranking-card, .trend-chart-card, .pest-distribution-chart-card, .severity-chart-card, .quick-actions-card {
@@ -303,9 +394,13 @@ export default {
         margin-right: 5px;
         color: #FFBA5A;
       }
-      white-space: nowrap;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: normal;
+      cursor: pointer;
     }
   }
   .level-critical { border-color: #FF5370; .warning-level { background: rgba(255, 83, 112, 0.2); color: #FF5370; } }
@@ -372,6 +467,16 @@ export default {
       border-color: #47C8FF;
     }
   }
+}
+
+.pest-distribution-chart-card .chart-row {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+}
+
+.pest-distribution-chart-card .chart-row > * {
+  flex: 1;
 }
 
 .footerbg {

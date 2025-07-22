@@ -206,7 +206,22 @@ app.get('/api/warnings', (req, res) => {
 });
 
 app.get('/api/user-detections', (req, res) => {
-  db.query('SELECT username as name, COUNT(*) as count FROM imgrecords GROUP BY username ORDER BY count DESC LIMIT 5', (err, results) => {
+  const query = `
+    SELECT
+        username as name,
+        COUNT(*) as count
+    FROM (
+        SELECT username FROM imgrecords WHERE username IS NOT NULL
+        UNION ALL
+        SELECT username FROM leafgraderecords WHERE username IS NOT NULL
+    ) AS combined_records
+    GROUP BY
+        username
+    ORDER BY
+        count DESC
+    LIMIT 5;
+  `;
+  db.query(query, (err, results) => {
     if (err) {
       res.status(500).send('Error fetching user detections');
       return;
@@ -225,45 +240,91 @@ const pestColors = {
 };
 
 app.get('/api/pest-distribution', (req, res) => {
-    db.query('SELECT label, COUNT(*) as count FROM imgrecords GROUP BY label', (err, results) => {
-    if (err) {
-      res.status(500).send('Error fetching pest distribution');
-      return;
-    }
+    db.query('SELECT label FROM imgrecords', (err, results) => {
+        if (err) {
+            res.status(500).send('Error fetching pest distribution');
+            return;
+        }
 
-        const total = results.reduce((sum, item) => sum + item.count, 0);
-        const distribution = results.map(item => {
+        const counts = {};
+        let totalDetections = 0;
+
+        results.forEach(record => {
+            let labels = [];
+            try {
+                const parsed = JSON.parse(record.label);
+                if (Array.isArray(parsed)) {
+                    labels = parsed;
+                }
+            } catch (e) {
+                if (record.label) {
+                    labels.push(record.label);
+                }
+            }
+            
+            labels.forEach(label => {
+                if (label) {
+                    counts[label] = (counts[label] || 0) + 1;
+                    totalDetections++;
+                }
+            });
+        });
+
+        const distribution = Object.entries(counts).map(([name, count]) => ({
+            name: name,
+            percentage: totalDetections > 0 ? Math.round((count / totalDetections) * 100) : 0,
+            color: pestColors[name] || '#FFFFFF'
+        }));
+
+        res.json({ distribution, total: totalDetections });
+    });
+});
+
+app.get('/api/leaf-grade-stats', (req, res) => {
+    const query = `
+        SELECT label, COUNT(*) as count 
+        FROM leafgraderecords 
+        GROUP BY label
+    `;
+    db.query(query, (err, results) => {
+        if (err) {
+            res.status(500).send('Error fetching leaf grade stats');
+            return;
+        }
+
+        const leafGradeColors = {
+            '1-2天': '#67C23A',
+            '2-4天': '#E6A23C',
+            '4-7天': '#F56C6C',
+            '7+天': '#909399'
+        };
+
+        const stats = results.map(row => {
             let label;
             try {
-                label = JSON.parse(item.label)[0];
-              
+                label = JSON.parse(row.label)[0];
             } catch(e) {
-                label = item.label;
+                label = row.label;
             }
             return {
                 name: label,
-                //percentage: total > 0 ? ((item.count / total) * 100) : 0,
-                percentage:item.count,
-                color: pestColors[label] || '#FFFFFF'
-            }
-        }).filter(item => item.name); // Filter out invalid labels
-
-        // Aggregate results with the same name
+                value: row.count,
+                color: leafGradeColors[label] || '#5A66FF'
+            };
+        }).filter(item => item.name);
+        
         const aggregated = {};
-        distribution.forEach(item => {
+        stats.forEach(item => {
           if (!aggregated[item.name]) {
-            aggregated[item.name] = { name: item.name, percentage: 0, color: item.color };
+            aggregated[item.name] = { name: item.name, value: 0, itemStyle: { color: item.color } };
           }
-          aggregated[item.name].percentage = parseFloat(aggregated[item.name].percentage) + parseFloat(item.percentage);
+          aggregated[item.name].value += item.value;
         });
         
-        const finalDistribution = Object.values(aggregated).map(item => ({
-            ...item,
-            percentage: item.percentage.toFixed(0)
-        }));
+        const total = Object.values(aggregated).reduce((sum, item) => sum + item.value, 0);
 
-        res.json(finalDistribution);
-  });
+        res.json({ stats: Object.values(aggregated), total });
+    });
 });
 
 
@@ -315,6 +376,55 @@ app.get('/api/severity-stats', (req, res) => {
         });
 
         res.json(Object.values(stats));
+    });
+});
+
+app.get('/api/detection-trend', (req, res) => {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0); // Start of the day
+
+    const query = `
+        SELECT
+            DATE(STR_TO_DATE(start_time, '%Y-%m-%d %H:%i:%s')) AS detection_date,
+            COUNT(*) as count
+        FROM
+            imgrecords
+        WHERE
+            STR_TO_DATE(start_time, '%Y-%m-%d %H:%i:%s') >= ?
+        GROUP BY
+            detection_date
+        ORDER BY
+            detection_date ASC;
+    `;
+
+    db.query(query, [sevenDaysAgo], (err, results) => {
+        if (err) {
+            console.error("Error fetching detection trend:", err);
+            res.status(500).send('Error fetching detection trend data');
+            return;
+        }
+
+        const labels = [];
+        const values = [];
+        const dailyCounts = new Map(results.map(row => {
+            const d = new Date(row.detection_date);
+            const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            return [dateKey, row.count];
+        }));
+
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            
+            const dateStringKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            const formattedLabel = `${date.getMonth() + 1}/${date.getDate()}`;
+
+            labels.push(formattedLabel);
+            values.push(dailyCounts.get(dateStringKey) || 0);
+        }
+
+        res.json({ labels, values });
     });
 });
 

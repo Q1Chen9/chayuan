@@ -76,8 +76,9 @@ export default {
   },
   methods: {
     updateTime() {
-      this.currentTime = '10:30:45';
-      this.currentDate = '2025/04/01 周二';
+      const now = dayjs();
+      this.currentTime = now.format('HH:mm:ss');
+      this.currentDate = now.format('YYYY/MM/DD dddd');
     }
   }
 }
