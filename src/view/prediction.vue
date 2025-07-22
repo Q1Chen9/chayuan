@@ -87,6 +87,7 @@
 
 <script>
 import { ref, onMounted } from 'vue';
+import axios from 'axios';
 import top from "./components/top/index.vue";
 import PestDistributionChart from './components/prediction/PestDistributionChart.vue';
 import SeverityLevelChart from './components/prediction/SeverityLevelChart.vue';
@@ -101,43 +102,33 @@ export default {
     DetectionTrendChart,
   },
   setup() {
-    const pestWarnings = ref([
-      { id: 1, name: '藻斑病', level: '紧急', area: 'A1区', time: '2分钟前', suggestion: '立即隔离A1区，并采用石硫合剂进行全面喷洒。' },
-      { id: 2, name: '茶盲蝽', level: '高', area: 'B3区', time: '15分钟前', suggestion: '使用杀虫灯诱杀，并喷洒高效氯氰菊酯。' },
-      { id: 3, name: '褐枯病', level: '高', area: 'A2区', time: '30分钟前', suggestion: '剪除病枝，集中烧毁，喷洒70%甲基托布津。' },
-      { id: 4, name: '赤叶枯病', level: '中', area: 'C1区', time: '1小时前', suggestion: '增施有机肥，改善通风，喷洒50%多菌灵。' },
-      { id: 5, name: '灰枯病', level: '中', area: 'D4区', time: '2小时前', suggestion: '清除落叶，减少病源，喷洒波尔多液。' },
-      { id: 6, name: '藻斑病', level: '低', area: 'B2区', time: '3小时前', suggestion: '注意观察，保持茶园干燥，暂不需用药。' },
-    ]);
-
-    const userDetections = ref([
-      { name: '王农艺师', count: 128 },
-      { name: '李技术员', count: 97 },
-      { name: '张操作员', count: 85 },
-      { name: '赵监测员', count: 72 },
-      { name: '孙巡查员', count: 66 },
-    ]);
-
-    const pestDistribution = ref([
-      { name: '藻斑病', percentage: 25, color: '#FF5370' },
-      { name: '褐枯病', percentage: 20, color: '#FFBA5A' },
-      { name: '灰枯病', percentage: 15, color: '#5A66FF' },
-      { name: '健康', percentage: 10, color: '#23fdc0' },
-      { name: '茶盲蝽', percentage: 18, color: '#47C8FF' },
-      { name: '赤叶枯病', percentage: 12, color: '#A66CFF' },
-    ]);
-    
-    const severityStats = ref([
-      { name: '紧急', count: 5, color: '#FF5370' },
-      { name: '高', count: 12, color: '#FFBA5A' },
-      { name: '中', count: 34, color: '#47C8FF' },
-      { name: '低', count: 58, color: '#23fdc0' },
-    ]);
-
+    const pestWarnings = ref([]);
+    const userDetections = ref([]);
+    const pestDistribution = ref([]);
+    const severityStats = ref([]);
     const detectionTrend = ref({
       labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
       values: [120, 132, 101, 134, 90, 230, 210],
     });
+
+    const fetchData = async () => {
+      try {
+        const warningsRes = await axios.get('http://localhost:3000/api/warnings');
+        pestWarnings.value = warningsRes.data;
+
+        const userDetectionsRes = await axios.get('http://localhost:3000/api/user-detections');
+        userDetections.value = userDetectionsRes.data;
+
+        const pestDistributionRes = await axios.get('http://localhost:3000/api/pest-distribution');
+        pestDistribution.value = pestDistributionRes.data;
+
+        const severityStatsRes = await axios.get('http://localhost:3000/api/severity-stats');
+        severityStats.value = severityStatsRes.data;
+
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+      }
+    };
 
     const getWarningClass = (level) => {
       switch (level) {
@@ -150,7 +141,7 @@ export default {
     };
 
     onMounted(() => {
-      // Future logic for fetching data or initializing charts
+      fetchData();
     });
     
     return {
