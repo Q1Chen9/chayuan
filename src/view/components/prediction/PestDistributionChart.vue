@@ -72,6 +72,7 @@ export default {
             labelLine: {
               show: false,
             },
+            
             data: props.chartData.map(item => ({
               value: item.percentage,
               name: item.name,
@@ -99,6 +100,7 @@ export default {
     };
   },
 };
+
 </script>
 
 <style scoped>

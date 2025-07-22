@@ -17,7 +17,7 @@
               </div>
               <div class="warning-details">
                 <span><i class="fas fa-location-dot"></i> {{ warning.area }}</span>
-                <span><i class="fas fa-clock"></i> {{ warning.time }}</span>
+                <span><i class="fas fa-clock"></i> {{ formatTime(warning.time) }}</span>
               </div>
               <div class="warning-suggestion">
                 <i class="fas fa-lightbulb"></i> {{ warning.suggestion }}
@@ -107,8 +107,8 @@ export default {
     const pestDistribution = ref([]);
     const severityStats = ref([]);
     const detectionTrend = ref({
-      labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-      values: [120, 132, 101, 134, 90, 230, 210],
+      labels: [],
+      values: [],
     });
 
     const fetchData = async () => {
@@ -124,6 +124,16 @@ export default {
 
         const severityStatsRes = await axios.get('http://localhost:3000/api/severity-stats');
         severityStats.value = severityStatsRes.data;
+        
+        // Fetch data for the trend chart
+        // This is a placeholder and should be replaced with a real endpoint if available
+        const trendRes = await axios.get('http://localhost:3000/api/warnings');
+        const trendData = trendRes.data.slice(0, 7).reverse();
+        detectionTrend.value = {
+          labels: trendData.map(d => new Date(d.time).toLocaleDateString()),
+          values: trendData.map((_, i) => Math.floor(Math.random() * 200) + 50) // Placeholder values
+        };
+
 
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -139,6 +149,20 @@ export default {
         default: return '';
       }
     };
+    
+    const formatTime = (timeString) => {
+      const date = new Date(timeString);
+      const now = new Date();
+      const diff = Math.abs(now - date);
+      const minutes = Math.floor(diff / (1000 * 60));
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+
+      if (minutes < 1) return '刚刚';
+      if (minutes < 60) return `${minutes}分钟前`;
+      if (hours < 24) return `${hours}小时前`;
+      return date.toLocaleDateString();
+    }
+
 
     onMounted(() => {
       fetchData();
@@ -151,6 +175,7 @@ export default {
       severityStats,
       detectionTrend,
       getWarningClass,
+      formatTime,
     };
   }
 }
@@ -278,6 +303,9 @@ export default {
         margin-right: 5px;
         color: #FFBA5A;
       }
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   }
   .level-critical { border-color: #FF5370; .warning-level { background: rgba(255, 83, 112, 0.2); color: #FF5370; } }
