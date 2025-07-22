@@ -23,10 +23,10 @@ const routes = [
         component: () => import('../view/monitor.vue')
     },
     {
-        path: '/test',
-        name: 'test',
-        title: '病虫害',
-        component: () => import('../view/test.vue')
+        path: '/prediction',
+        name: 'prediction',
+        title: '预测',
+        component: () => import('../view/prediction.vue')
     }
 ]
 
