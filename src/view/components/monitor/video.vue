@@ -57,41 +57,32 @@
   </div>
 </template>
 
-<script>
-import teaImage from '@/assets/tea.jpg'
+<script setup>
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import dayjs from 'dayjs';
 
-export default {
-  name: 'MonitorVideo',
-  data() {
-    return {
-      currentTime: '10:30:45',
-      timer: null,
-      teaImage
-    };
-  },
-  mounted() {
-    this.updateTime();
-    this.timer = setInterval(this.updateTime, 1000);
-  },
-  beforeUnmount() {
-    clearInterval(this.timer);
-  },
-  methods: {
-    updateTime() {
-      this.currentTime = '10:30:45';
-    },
-    switchCamera(id) {
-      // 实际应用中，这里会切换不同的摄像头视频源
-      console.log(`切换到摄像头 ${id}`);
-      // 这里只是模拟切换效果
-      const video = this.$refs.videoPlayer;
-      if (video) {
-        video.currentTime = 0;
-        video.play();
-      }
-    }
-  }
+const currentTime = ref('');
+let timer = null;
+
+const updateTime = () => {
+  currentTime.value = dayjs().format('YYYY-MM-DD HH:mm:ss');
 };
+
+const switchCamera = (id) => {
+  // 实际应用中，这里会切换不同的摄像头视频源
+  console.log(`切换到摄像头 ${id}`);
+};
+
+onMounted(() => {
+  updateTime();
+  timer = setInterval(updateTime, 1000);
+});
+
+onBeforeUnmount(() => {
+  if (timer) {
+    clearInterval(timer);
+  }
+});
 </script>
 
 <style lang="scss" scoped>

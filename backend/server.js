@@ -272,7 +272,7 @@ app.get('/api/pest-distribution', (req, res) => {
 
         const distribution = Object.entries(counts).map(([name, count]) => ({
             name: name,
-            percentage: totalDetections > 0 ? Math.round((count / totalDetections) * 100) : 0,
+            percentage: count,
             color: pestColors[name] || '#FFFFFF'
         }));
 

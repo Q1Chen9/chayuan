@@ -40,7 +40,7 @@
         <i class="fas fa-clock"></i>
         <span>更新: {{ currentTime }} | </span>
         <i class="fas fa-cloud-sun"></i>
-        <span>天气: 晴朗 23°C</span>
+        <span>天气: {{ weatherDescription }}</span>
       </div>
       <div class="suggestion-list">
         <div class="suggestion-item" v-for="(suggestion, index) in suggestions" :key="index">
@@ -52,171 +52,335 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'MonitorRealtimeData',
-  data() {
-    return {
-      currentTime: "2025-04-01 10:30",
-      dataItems: [
-        {
-          title: '空气质量',
-          value: 45,
-          unit: 'AQI',
-          icon: 'fas fa-wind',
-          class: 'air',
-          max: 100,
-          min: 0,
-          danger: 75,
-          warning: 50,
-          trendIcon: 'fas fa-arrow-down',
-          trendValue: '5%',
-          trendClass: 'trend-down',
-          info: '空气质量良好，PM2.5低'
-        },
-        {
-          title: '二氧化碳',
-          value: 426,
-          unit: 'ppm',
-          icon: 'fas fa-smog',
-          class: 'co2',
-          max: 1000,
-          min: 300,
-          danger: 800,
-          warning: 600,
-          trendIcon: 'fas fa-arrow-up',
-          trendValue: '3%',
-          trendClass: 'trend-up',
-          info: '浓度在安全范围内'
-        },
-        {
-          title: '温度',
-          value: 24.5,
-          unit: '°C',
-          icon: 'fas fa-temperature-high',
-          class: 'temperature',
-          max: 40,
-          min: 0,
-          danger: 35,
-          warning: 30,
-          trendIcon: 'fas fa-arrow-up',
-          trendValue: '1.2°C',
-          trendClass: 'trend-up',
-          info: '适宜植物生长'
-        },
-        {
-          title: '湿度',
-          value: 68,
-          unit: '%',
-          icon: 'fas fa-tint',
-          class: 'humidity',
-          max: 100,
-          min: 0,
-          danger: 90,
-          warning: 80,
-          trendIcon: 'fas fa-arrow-down',
-          trendValue: '5%',
-          trendClass: 'trend-down',
-          info: '湿度适中，有利光合作用'
-        },
-        {
-          title: '光照强度',
-          value: 65,
-          unit: 'klux',
-          icon: 'fas fa-sun',
-          class: 'light',
-          max: 100,
-          min: 0,
-          danger: 85,
-          warning: 75,
-          trendIcon: 'fas fa-arrow-up',
-          trendValue: '15%',
-          trendClass: 'trend-up',
-          info: '建议适当遮阴'
-        },
-        {
-          title: '降雨量',
-          value: 0,
-          unit: 'mm',
-          icon: 'fas fa-cloud-rain',
-          class: 'rainfall',
-          max: 50,
-          min: 0,
-          danger: 30,
-          warning: 15,
-          trendIcon: 'fas fa-equals',
-          trendValue: '0mm',
-          trendClass: 'trend-steady',
-          info: '今日无降雨，建议浇水'
-        }
-      ],
-      suggestions: [
-        { icon: 'fas fa-hand-holding-water', text: '今日晴朗，建议增加灌溉量，防止土壤水分流失' },
-        { icon: 'fas fa-umbrella-beach', text: '午后光照强，建议为幼苗提供遮阴' },
-        { icon: 'fas fa-bug', text: '气温回升，注意监测害虫活动' }
-      ]
-    };
+<script setup>
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+
+const props = defineProps({
+  weatherData: {
+    type: Object,
+    default: null
+  }
+});
+
+const currentTime = ref(formatTime(new Date()));
+const weatherDescription = ref('晴朗 23°C');
+const dataItems = ref([
+  {
+    title: '空气质量',
+    value: 45,
+    unit: 'AQI',
+    icon: 'fas fa-wind',
+    class: 'air',
+    max: 100,
+    min: 0,
+    danger: 75,
+    warning: 50,
+    trendIcon: 'fas fa-arrow-down',
+    trendValue: '5%',
+    trendClass: 'trend-down',
+    info: '空气质量良好，PM2.5低'
   },
-  mounted() {
-    // 更新时间定时器
-    this.timer = setInterval(() => {
-      this.currentTime = this.formatTime(new Date());
-    }, 60000); // 每分钟更新一次
+  {
+    title: '二氧化碳',
+    value: 426,
+    unit: 'ppm',
+    icon: 'fas fa-smog',
+    class: 'co2',
+    max: 1000,
+    min: 300,
+    danger: 800,
+    warning: 600,
+    trendIcon: 'fas fa-arrow-up',
+    trendValue: '3%',
+    trendClass: 'trend-up',
+    info: '浓度在安全范围内'
   },
-  beforeUnmount() {
-    // 清除定时器
-    if (this.timer) {
-      clearInterval(this.timer);
+  {
+    title: '温度',
+    value: 24.5,
+    unit: '°C',
+    icon: 'fas fa-temperature-high',
+    class: 'temperature',
+    max: 40,
+    min: 0,
+    danger: 35,
+    warning: 30,
+    trendIcon: 'fas fa-arrow-up',
+    trendValue: '1.2°C',
+    trendClass: 'trend-up',
+    info: '适宜植物生长'
+  },
+  {
+    title: '湿度',
+    value: 68,
+    unit: '%',
+    icon: 'fas fa-tint',
+    class: 'humidity',
+    max: 100,
+    min: 0,
+    danger: 90,
+    warning: 80,
+    trendIcon: 'fas fa-arrow-down',
+    trendValue: '5%',
+    trendClass: 'trend-down',
+    info: '湿度适中，有利光合作用'
+  },
+  {
+    title: '光照强度',
+    value: 65,
+    unit: 'klux',
+    icon: 'fas fa-sun',
+    class: 'light',
+    max: 100,
+    min: 0,
+    danger: 85,
+    warning: 75,
+    trendIcon: 'fas fa-arrow-up',
+    trendValue: '15%',
+    trendClass: 'trend-up',
+    info: '建议适当遮阴'
+  },
+  {
+    title: '降雨量',
+    value: 0,
+    unit: 'mm',
+    icon: 'fas fa-cloud-rain',
+    class: 'rainfall',
+    max: 50,
+    min: 0,
+    danger: 30,
+    warning: 15,
+    trendIcon: 'fas fa-equals',
+    trendValue: '0mm',
+    trendClass: 'trend-steady',
+    info: '今日无降雨，建议浇水'
+  }
+]);
+const suggestions = ref([
+  { icon: 'fas fa-hand-holding-water', text: '今日晴朗，建议增加灌溉量，防止土壤水分流失' },
+  { icon: 'fas fa-umbrella-beach', text: '午后光照强，建议为幼苗提供遮阴' },
+  { icon: 'fas fa-bug', text: '气温回升，注意监测害虫活动' }
+]);
+
+let timeTimer = null;
+
+const weatherCodeMap = {
+    0: '晴', 1: '少云', 2: '多云', 3: '阴', 45: '雾', 48: '霜雾',
+    51: '小毛毛雨', 53: '中等毛毛雨', 55: '大毛毛雨', 56: '冰冻毛毛雨', 57: '浓冰冻毛毛雨',
+    61: '小雨', 63: '中雨', 65: '大雨', 66: '冰雨', 67: '大冰雨',
+    71: '小雪', 73: '中雪', 75: '大雪', 77: '雪粒',
+    80: '小阵雨', 81: '中阵雨', 82: '大阵雨',
+    85: '小雪阵', 86: '大雪阵', 95: '雷暴',
+    96: '雷暴伴有小冰雹', 99: '雷暴伴有大冰雹',
+};
+
+const getWeatherDescription = (code) => weatherCodeMap[code] || '未知';
+
+function formatTime(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+const updateRandomData = () => {
+  dataItems.value = dataItems.value.map(item => {
+    const oldValue = item.value;
+    let newValue;
+
+    switch(item.title) {
+      case '空气质量':
+        newValue = oldValue + (Math.random() - 0.5) * 2;
+        break;
+      case '二氧化碳':
+        newValue = oldValue + (Math.random() - 0.4) * 5;
+        break;
+      case '温度':
+        newValue = oldValue + (Math.random() - 0.5) * 0.2;
+        break;
+      case '湿度':
+        newValue = oldValue + (Math.random() - 0.5) * 1;
+        break;
+      case '光照强度':
+        newValue = oldValue + (Math.random() - 0.5) * 3;
+        break;
+      case '降雨量':
+        newValue = oldValue;
+        break;
+      default:
+        newValue = oldValue;
     }
-  },
-  methods: {
-    formatTime(date) {
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `${hours}:${minutes}`;
-    },
-    getPercentage(item) {
-      if (item.isText) return 100;
-      return ((item.value - item.min) / (item.max - item.min)) * 100;
-    },
-    getMarkerPosition(item, type) {
-      if (item.isText || !item[type]) return 0;
-      return ((item[type] - item.min) / (item.max - item.min)) * 100;
-    },
-    getStatusColor(item) {
-      if (item.isText) return 'linear-gradient(90deg, #47C8FF 0%, #23fdc0 100%)';
-      
-      if (item.value >= item.danger) {
-        return 'linear-gradient(90deg, #FF5370 0%, #ff8f70 100%)';
-      } else if (item.value >= item.warning) {
-        return 'linear-gradient(90deg, #FFBA5A 0%, #FFE45A 100%)';
+
+    newValue = Math.max(item.min, Math.min(item.max, newValue));
+    const change = newValue - oldValue;
+
+    let trendIcon, trendValue, trendClass;
+
+    if (Math.abs(change) < 0.05) {
+      trendIcon = 'fas fa-equals';
+      trendClass = 'trend-steady';
+       if (item.unit === '°C' || item.unit === 'mm') {
+         trendValue = `0${item.unit}`;
+       } else {
+         trendValue = '0%';
+       }
+    } else {
+      if (change > 0) {
+        trendIcon = 'fas fa-arrow-up';
+        trendClass = 'trend-up';
       } else {
-        return 'linear-gradient(90deg, #47C8FF 0%, #23fdc0 100%)';
+        trendIcon = 'fas fa-arrow-down';
+        trendClass = 'trend-down';
       }
-    },
-    getStatusClass(item) {
-      if (item.isText) return '';
       
-      if (item.value >= item.danger) {
-        return 'status-danger';
-      } else if (item.value >= item.warning) {
-        return 'status-warning';
+      if (item.unit === '°C' || item.unit === 'mm') {
+        trendValue = `${Math.abs(change).toFixed(1)}${item.unit}`;
+      } else if (oldValue !== 0) {
+        trendValue = `${(Math.abs(change) / oldValue * 100).toFixed(0)}%`;
       } else {
-        return 'status-normal';
+        trendValue = 'N/A';
       }
-    },
-    getStatusText(item) {
-      if (item.isText) return '';
+    }
+
+    return {
+      ...item,
+      value: parseFloat(newValue.toFixed(1)),
+      trendIcon,
+      trendValue,
+      trendClass
+    };
+  });
+};
+
+const updateRealData = (weatherData) => {
+    if (!weatherData || !weatherData.current) {
+      updateRandomData();
+      return;
+    }
+    const currentData = weatherData.current;
+    dataItems.value = dataItems.value.map(item => {
+        const oldValue = item.value;
+        let newValue = oldValue;
+        let info = item.info;
+
+        switch(item.title) {
+            case '温度':
+                newValue = currentData.temperature_2m;
+                info = `体感: ${currentData.apparent_temperature}°C`;
+                break;
+            case '湿度':
+                newValue = currentData.relative_humidity_2m;
+                info = currentData.relative_humidity_2m > 70 ? '湿度较高' : '湿度适中';
+                break;
+            case '降雨量':
+                newValue = currentData.precipitation;
+                info = currentData.precipitation > 0 ? '正在下雨' : '今日无雨';
+                break;
+            case '空气质量':
+                const windSpeed = currentData.wind_speed_10m;
+                newValue = Math.max(0, 100 - windSpeed * 5);
+                info = `风速 ${windSpeed} km/h`;
+                break;
+            case '光照强度':
+                newValue = currentData.is_day ? 70 + (Math.random() - 0.5) * 10 : 5 + (Math.random() - 0.5) * 10;
+                info = currentData.is_day ? '白天' : '夜间';
+                break;
+            case '二氧化碳':
+                newValue = oldValue + (Math.random() - 0.4) * 5;
+                break;
+        }
+
+        newValue = Math.max(item.min, Math.min(item.max, parseFloat(newValue.toFixed(1))));
+        const change = newValue - oldValue;
+
+        let trendIcon, trendValue, trendClass;
+
+        if (Math.abs(change) < 0.1) {
+            trendIcon = 'fas fa-equals';
+            trendClass = 'trend-steady';
+            trendValue = '稳定';
+        } else {
+            if (change > 0) {
+                trendIcon = 'fas fa-arrow-up';
+                trendClass = 'trend-up';
+            } else {
+                trendIcon = 'fas fa-arrow-down';
+                trendClass = 'trend-down';
+            }
+            if (item.unit === '°C' || item.unit === 'mm') {
+                trendValue = `${Math.abs(change).toFixed(1)}${item.unit}`;
+            } else if (oldValue !== 0) {
+                trendValue = `${Math.abs((change / oldValue) * 100).toFixed(0)}%`;
+            } else {
+                trendValue = 'N/A';
+            }
+        }
+        
+        return { ...item, value: newValue, info, trendIcon, trendValue, trendClass };
+    });
+};
+
+watch(() => props.weatherData, (newVal) => {
+  if (newVal) {
+    updateRealData(newVal);
+     if (newVal.current && newVal.daily?.time.length > 0) {
+      const currentTemp = newVal.current.temperature_2m;
+      const today = new Date().toISOString().slice(0, 10);
+      const todayIndex = newVal.daily.time.findIndex(day => day === today);
       
-      if (item.value >= item.danger) {
-        return '偏高';
-      } else if (item.value >= item.warning) {
-        return '略高';
-      } else {
-        return '正常';
+      let code = -1;
+      if (todayIndex !== -1) {
+        code = newVal.daily.weather_code[todayIndex];
       }
+      
+      weatherDescription.value = `${getWeatherDescription(code)} ${currentTemp}°C`;
     }
   }
+}, { immediate: true, deep: true });
+
+
+onMounted(() => {
+    timeTimer = setInterval(() => {
+        currentTime.value = formatTime(new Date());
+    }, 1000);
+});
+
+onBeforeUnmount(() => {
+    if (timeTimer) clearInterval(timeTimer);
+});
+
+const getPercentage = (item) => {
+  if (item.isText) return 100;
+  return ((item.value - item.min) / (item.max - item.min)) * 100;
+};
+
+const getMarkerPosition = (item, type) => {
+  if (item.isText || !item[type]) return 0;
+  return ((item[type] - item.min) / (item.max - item.min)) * 100;
+};
+
+const getStatusColor = (item) => {
+  if (item.isText) return 'linear-gradient(90deg, #47C8FF 0%, #23fdc0 100%)';
+  if (item.value >= item.danger) return 'linear-gradient(90deg, #FF5370 0%, #ff8f70 100%)';
+  if (item.value >= item.warning) return 'linear-gradient(90deg, #FFBA5A 0%, #FFE45A 100%)';
+  return 'linear-gradient(90deg, #47C8FF 0%, #23fdc0 100%)';
+};
+
+const getStatusClass = (item) => {
+  if (item.isText) return '';
+  if (item.value >= item.danger) return 'status-danger';
+  if (item.value >= item.warning) return 'status-warning';
+  return 'status-normal';
+};
+
+const getStatusText = (item) => {
+  if (item.isText) return '';
+  if (item.value >= item.danger) return '偏高';
+  if (item.value >= item.warning) return '略高';
+  return '正常';
 };
 </script>
 

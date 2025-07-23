@@ -25,7 +25,7 @@
       <div class="monitormaincenter">
         <div class="item1">
           <item-big name="实时环境数据" icon="icon-realtime" :duration="0.5" :delay="0.5">
-            <monitor-realtime-data></monitor-realtime-data>
+            <monitor-realtime-data :weather-data="weatherData"></monitor-realtime-data>
           </item-big>
         </div>
         <div class="item2">
@@ -39,7 +39,7 @@
       <div class="monitormainr">
         <div class="item1">
           <item name="空气质量" icon="icon-air" :duration="0.5" :delay="0">
-            <monitor-air-trend></monitor-air-trend>
+            <monitor-air-trend :weather-data="weatherData"></monitor-air-trend>
           </item>
         </div>
         <div class="item2">
@@ -49,7 +49,7 @@
         </div>
         <div class="item3">
           <item name="温湿度" icon="icon-temperature" :duration="0.5" :delay="0.6">
-            <monitor-temp-humidity-trend></monitor-temp-humidity-trend>
+            <monitor-temp-humidity-trend :weather-data="weatherData"></monitor-temp-humidity-trend>
           </item>
         </div>
         <div class="item4">
@@ -59,7 +59,7 @@
         </div>
         <div class="item5">
           <item name="光照" icon="icon-light" :duration="0.5" :delay="1.2">
-            <monitor-light-trend></monitor-light-trend>
+            <monitor-light-trend :weather-data="weatherData"></monitor-light-trend>
           </item>
         </div>
       </div>
@@ -69,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import top from "./components/top/index.vue";
 import item from "./components/item/index.vue";
 import itemBig from "./components/itemBig/index.vue";
@@ -87,12 +87,56 @@ import MonitorPesticide from "./components/monitor/pesticide.vue";
 import WOW from "wow.js";
 import { gsap } from 'gsap';
 
+const weatherData = ref(null);
+let dataTimer = null;
+
+const fetchWeatherData = async (lat, lon) => {
+  try {
+    const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,is_day,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto`);
+    if (!response.ok) {
+      throw new Error('Weather data fetch failed');
+    }
+    const data = await response.json();
+    weatherData.value = data;
+  } catch (error) {
+    console.error("Failed to fetch weather data.", error);
+  }
+};
+
 onMounted(() => {
   const wow = new WOW({
     boxClass: "wow",
     animateClass: "animated"
   });
   wow.init();
+
+  const startDataUpdates = (lat, lon) => {
+    fetchWeatherData(lat, lon);
+    dataTimer = setInterval(() => fetchWeatherData(lat, lon), 5 * 60 * 1000);
+  };
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        startDataUpdates(position.coords.latitude, position.coords.longitude);
+      },
+      (error) => {
+        console.error("Geolocation error:", error.message, ". Using default location.");
+        const hangzhou = { latitude: 30.2741, longitude: 120.1551 };
+        startDataUpdates(hangzhou.latitude, hangzhou.longitude);
+      }
+    );
+  } else {
+    console.log("Geolocation is not supported. Using default location.");
+    const hangzhou = { latitude: 30.2741, longitude: 120.1551 };
+    startDataUpdates(hangzhou.latitude, hangzhou.longitude);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (dataTimer) {
+    clearInterval(dataTimer);
+  }
 });
 </script>
 

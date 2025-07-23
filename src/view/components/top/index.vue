@@ -7,7 +7,7 @@
         <button class="nav-btn" @click="navigateTo('/monitor')">环境</button>
         <button class="nav-btn" @click="navigateTo('/production')">生产</button>
         <button class="nav-btn" @click="navigateTo('/sales')">销售</button>
-        <button class="nav-btn" @click="navigateTo('/prediction')">预测</button>
+        <button class="nav-btn" @click="navigateTo('/prediction')">监测</button>
       </div>
     </div>
     <div class="title">
