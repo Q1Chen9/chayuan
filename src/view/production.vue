@@ -250,7 +250,7 @@
         <div class="process-step roasting">
           <div class="step-header">
             <div class="step-icon">
-              <i class="fas fa-pot-food"></i>
+              <i class="fas fa-fire"></i>
             </div>
             <div class="step-title">辉锅</div>
           </div>

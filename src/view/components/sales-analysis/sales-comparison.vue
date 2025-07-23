@@ -10,16 +10,39 @@ import * as echarts from 'echarts';
 
 const chartContainer = ref(null);
 let chart = null;
+let dataTimer = null;
 
 // 各品牌销量数据
-const brandsData = [
+const brandsData = ref([
   { name: '西湖龙井', sales: 12385, highlight: true },
   { name: '狮峰龙井', sales: 8745, highlight: false },
   { name: '梅家坞龙井', sales: 7862, highlight: false },
   { name: '五云龙井', sales: 5438, highlight: false },
   { name: '虎跑龙井', sales: 4765, highlight: false },
   { name: '龙坞龙井', sales: 3280, highlight: false }
-];
+]);
+
+const updateData = () => {
+  brandsData.value = brandsData.value.map(brand => {
+    const change = (Math.random() - 0.45) * brand.sales * 0.03;
+    return { ...brand, sales: Math.max(2000, brand.sales + change) };
+  });
+
+  const sortedData = [...brandsData.value].sort((a, b) => b.sales - a.sales);
+
+  chart.setOption({
+    xAxis: {
+      data: sortedData.map(item => item.name),
+    },
+    series: [{
+      data: sortedData.map((item, index) => ({
+        ...chart.getOption().series[0].data[index],
+        value: item.sales
+      }))
+    }]
+  });
+};
+
 
 const initChart = () => {
   if (!chartContainer.value) return;
@@ -27,7 +50,7 @@ const initChart = () => {
   chart = echarts.init(chartContainer.value);
   
   // 排序从高到低
-  const sortedData = [...brandsData].sort((a, b) => b.sales - a.sales);
+  const sortedData = [...brandsData.value].sort((a, b) => b.sales - a.sales);
   
   // 为不同品牌设置不同颜色
   const brandColors = [
@@ -57,7 +80,7 @@ const initChart = () => {
         const data = params[0];
         return `<div style="font-size:14px;color:#fff;font-weight:bold;margin-bottom:5px">${data.name}</div>
                 <div style="font-size:12px;color:rgba(255,255,255,0.7)">
-                销量: ${data.value}单
+                销量: ${Math.round(data.value)}单
                 </div>`;
       },
       backgroundColor: 'rgba(0,0,0,0.7)',
@@ -143,9 +166,11 @@ const handleResize = () => {
 
 onMounted(() => {
   initChart();
+  dataTimer = setInterval(updateData, 2800);
 });
 
 onBeforeUnmount(() => {
+  if (dataTimer) clearInterval(dataTimer);
   if (chart) {
     chart.dispose();
     chart = null;

@@ -25,9 +25,9 @@ import * as echarts from 'echarts';
 
 const chartContainer = ref(null);
 let chart = null;
+let dataTimer = null;
 
-// 区域销量数据
-const regionData = ref([
+const initialData = [
   { name: '浙江省', value: 3865 },
   { name: '江苏省', value: 2472 },
   { name: '上海市', value: 1958 },
@@ -38,7 +38,27 @@ const regionData = ref([
   { name: '四川省', value: 385 },
   { name: '湖北省', value: 253 },
   { name: '山东省', value: 189 }
-].sort((a, b) => b.value - a.value));
+];
+
+const regionData = ref([...initialData].sort((a, b) => b.value - a.value));
+
+const updateData = () => {
+  regionData.value = regionData.value.map(region => {
+    const change = (Math.random() - 0.48) * region.value * 0.05;
+    return { ...region, value: Math.max(100, Math.round(region.value + change)) };
+  }).sort((a, b) => b.value - a.value);
+
+  if (chart) {
+    chart.setOption({
+      series: [{
+        data: regionData.value.map(item => ({
+          value: item.value,
+          name: item.name
+        }))
+      }]
+    });
+  }
+};
 
 const initChart = () => {
   if (!chartContainer.value) return;
@@ -49,7 +69,7 @@ const initChart = () => {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'item',
-      formatter: '{b}: {c}单 ({d}%)',
+      formatter: (params) => `${params.name}: ${params.value}单 (${params.percent.toFixed(0)}%)`,
       backgroundColor: 'rgba(0,0,0,0.7)',
       borderColor: 'rgba(255,255,255,0.2)',
       borderWidth: 1,
@@ -119,9 +139,11 @@ const handleResize = () => {
 
 onMounted(() => {
   initChart();
+  dataTimer = setInterval(updateData, 3000);
 });
 
 onBeforeUnmount(() => {
+  if (dataTimer) clearInterval(dataTimer);
   if (chart) {
     chart.dispose();
     chart = null;

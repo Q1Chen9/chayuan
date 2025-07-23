@@ -10,9 +10,9 @@ import * as echarts from 'echarts';
 
 const chartContainer = ref(null);
 let chart = null;
+let dataTimer = null;
 
-// 渠道话题占比数据
-const topicData = [
+const topicData = ref([
   { name: '小红书', value: 28.5, color: '#ff2e4d' },
   { name: '微博', value: 22.3, color: '#ff9933' },
   { name: '知乎', value: 17.6, color: '#0084ff' },
@@ -20,7 +20,40 @@ const topicData = [
   { name: '抖音', value: 10.4, color: '#000000' },
   { name: '京东', value: 5.3, color: '#d71c1e' },
   { name: '拼多多', value: 3.1, color: '#e22e59' },
-];
+]);
+
+const updateData = () => {
+  let totalValue = 100;
+  const changes = topicData.value.map(() => (Math.random() - 0.5) * 1);
+  let newValues = topicData.value.map((item, index) => item.value + changes[index]);
+
+  const currentTotal = newValues.reduce((sum, v) => sum + v, 0);
+  newValues = newValues.map(v => Math.max(2, (v / currentTotal) * totalValue));
+  
+  const finalTotal = newValues.reduce((sum, v) => sum + v, 0);
+  const correction = totalValue / finalTotal;
+  
+  topicData.value.forEach((item, index) => {
+    item.value = parseFloat((newValues[index] * correction).toFixed(1));
+  });
+
+  if (chart) {
+    chart.setOption({
+      legend: {
+        formatter: function(name) {
+          const item = topicData.value.find(item => item.name === name);
+          return `${name} ${item.value.toFixed(0)}%`;
+        }
+      },
+      series: [{
+        data: topicData.value.map(item => ({
+          value: item.value,
+          name: item.name
+        }))
+      }]
+    });
+  }
+};
 
 const initChart = () => {
   if (!chartContainer.value) return;
@@ -41,7 +74,7 @@ const initChart = () => {
     },
     tooltip: {
       trigger: 'item',
-      formatter: '{b}: {c}% ({d}%)',
+      formatter: (params) => `${params.name}: ${params.value.toFixed(0)}% (${params.percent.toFixed(0)}%)`,
       backgroundColor: 'rgba(0,0,0,0.7)',
       borderColor: 'rgba(255,255,255,0.2)',
       borderWidth: 1,
@@ -61,8 +94,8 @@ const initChart = () => {
         fontSize: 12
       },
       formatter: function(name) {
-        const item = topicData.find(item => item.name === name);
-        return `${name} ${item.value}%`;
+        const item = topicData.value.find(item => item.name === name);
+        return `${name} ${item.value.toFixed(0)}%`;
       }
     },
     series: [
@@ -85,7 +118,7 @@ const initChart = () => {
             show: true,
             fontSize: 14,
             fontWeight: 'bold',
-            formatter: '{b}: {c}%'
+            formatter: (params) => `${params.name}: ${params.value.toFixed(0)}%`
           },
           itemStyle: {
             shadowBlur: 10,
@@ -96,7 +129,7 @@ const initChart = () => {
         labelLine: {
           show: false
         },
-        data: topicData.map(item => ({
+        data: topicData.value.map(item => ({
           value: item.value,
           name: item.name,
           itemStyle: {
@@ -119,9 +152,11 @@ const handleResize = () => {
 
 onMounted(() => {
   initChart();
+  dataTimer = setInterval(updateData, 2200);
 });
 
 onBeforeUnmount(() => {
+  if (dataTimer) clearInterval(dataTimer);
   if (chart) {
     chart.dispose();
     chart = null;

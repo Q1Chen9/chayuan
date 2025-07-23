@@ -4,7 +4,7 @@
       <div class="chart" ref="chartEl"></div>
       <div class="center-info">
         <div class="info-label">有机肥占比</div>
-        <div class="info-value">25%</div>
+        <div class="info-value">{{ organicFertilizerPercentage }}%</div>
       </div>
     </div>
     
@@ -24,107 +24,148 @@
       <div class="data-summary">
         <div class="summary-item">
           <div class="summary-label">同比上月</div>
-          <div class="summary-value down">
-            <i class="iconfont icon-down"></i>
-            <span>8.2%</span>
+          <div class="summary-value" :class="trend.class">
+            <i class="iconfont" :class="trend.icon"></i>
+            <span>{{ trend.value }}%</span>
           </div>
         </div>
-        <div class="suggestion">建议增加有机肥施用比例</div>
+        <div class="suggestion">{{ suggestion }}</div>
       </div>
     </div>
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import * as echarts from 'echarts';
 
-export default {
-  name: 'MonitorFertilizer',
-  data() {
-    return {
-      chart: null,
-      fertilizerData: [
-        { value: 35, name: '氮肥', itemStyle: { color: '#47C8FF' } },
-        { value: 25, name: '磷肥', itemStyle: { color: '#FFBA5A' } },
-        { value: 20, name: '钾肥', itemStyle: { color: '#23fdc0' } },
-        { value: 15, name: '复合肥', itemStyle: { color: '#5A66FF' } },
-        { value: 5, name: '有机肥', itemStyle: { color: '#FF5370' } }
-      ]
-    };
-  },
-  mounted() {
-    this.initChart();
-    window.addEventListener('resize', this.resizeChart);
-  },
-  beforeUnmount() {
-    window.removeEventListener('resize', this.resizeChart);
-    if (this.chart) {
-      this.chart.dispose();
-      this.chart = null;
-    }
-  },
-  methods: {
-    initChart() {
-      this.chart = echarts.init(this.$refs.chartEl);
-      this.updateChart();
-    },
-    resizeChart() {
-      if (this.chart) {
-        this.chart.resize();
-      }
-    },
-    updateChart() {
-      const option = {
-        backgroundColor: 'transparent',
-        tooltip: {
-          trigger: 'item',
-          formatter: '{b}: {c}%',
-          textStyle: {
-            fontSize: 12
-          }
-        },
-        series: [
-          {
-            name: '肥料使用',
-            type: 'pie',
-            radius: ['45%', '80%'],
-            center: ['50%', '50%'],
-            avoidLabelOverlap: false,
-            itemStyle: {
-              borderRadius: 6,
-              borderColor: 'rgba(0, 0, 0, 0.1)',
-              borderWidth: 2
-            },
-            label: {
-              show: false
-            },
-            emphasis: {
-              label: {
-                show: false
-              },
-              itemStyle: {
-                shadowBlur: 10,
-                shadowOffsetX: 0,
-                shadowColor: 'rgba(0, 0, 0, 0.5)'
-              }
-            },
-            labelLine: {
-              show: false
-            },
-            data: this.fertilizerData,
-            animationType: 'scale',
-            animationEasing: 'elasticOut',
-            animationDuration: 800,
-            animationDelay: function (idx) {
-              return Math.random() * 200;
-            }
-          }
-        ]
-      };
-      this.chart.setOption(option);
-    }
+const chart = ref(null);
+const fertilizerData = ref([
+  { value: 35, name: '氮肥', itemStyle: { color: '#47C8FF' } },
+  { value: 25, name: '磷肥', itemStyle: { color: '#FFBA5A' } },
+  { value: 20, name: '钾肥', itemStyle: { color: '#23fdc0' } },
+  { value: 15, name: '复合肥', itemStyle: { color: '#5A66FF' } },
+  { value: 5, name: '有机肥', itemStyle: { color: '#FF5370' } }
+]);
+const trend = ref({
+  value: 8.2,
+  class: 'down',
+  icon: 'icon-down'
+});
+
+const organicFertilizerPercentage = computed(() => {
+  const organic = fertilizerData.value.find(f => f.name === '有机肥');
+  return organic ? organic.value : 0;
+});
+
+const suggestion = computed(() => {
+    return organicFertilizerPercentage.value < 10 ? '建议增加有机肥施用比例' : '有机肥施用比例良好';
+});
+
+let dataTimer = null;
+
+const initChart = () => {
+  const chartDom = document.querySelector('.fertilizer-chart .chart');
+  if (chartDom) {
+    chart.value = echarts.init(chartDom);
+    updateChart();
   }
 };
+
+const resizeChart = () => {
+  if (chart.value) {
+    chart.value.resize();
+  }
+};
+
+const updateData = () => {
+    let totalValue = 100;
+    const changes = fertilizerData.value.map(() => (Math.random() - 0.5) * 2);
+    let newValues = fertilizerData.value.map((item, index) => item.value + changes[index]);
+
+    const currentTotal = newValues.reduce((sum, v) => sum + v, 0);
+    newValues = newValues.map(v => Math.max(5, (v / currentTotal) * totalValue));
+
+    const finalTotal = newValues.reduce((sum, v) => sum + v, 0);
+    const correction = totalValue / finalTotal;
+    fertilizerData.value.forEach((item, index) => {
+        item.value = parseFloat((newValues[index] * correction).toFixed(1));
+    });
+
+    const trendChange = (Math.random() - 0.5) * 2;
+    let newTrend = parseFloat(trend.value) + trendChange;
+    newTrend = Math.max(0, Math.min(15, newTrend));
+    trend.value = newTrend.toFixed(1);
+    trend.class = trendChange > 0 ? 'up' : 'down';
+    trend.icon = trendChange > 0 ? 'icon-up' : 'icon-down';
+    
+    updateChart();
+};
+
+const updateChart = () => {
+  if (!chart.value) return;
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: {c}%',
+      textStyle: {
+        fontSize: 12
+      }
+    },
+    series: [
+      {
+        name: '肥料使用',
+        type: 'pie',
+        radius: ['45%', '80%'],
+        center: ['50%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 6,
+          borderColor: 'rgba(0, 0, 0, 0.1)',
+          borderWidth: 2
+        },
+        label: {
+          show: false
+        },
+        emphasis: {
+          label: {
+            show: false
+          },
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        },
+        labelLine: {
+          show: false
+        },
+        data: fertilizerData.value,
+        animationType: 'scale',
+        animationEasing: 'elasticOut',
+        animationDuration: 800
+      }
+    ]
+  };
+  chart.value.setOption(option);
+};
+
+onMounted(() => {
+  initChart();
+  window.addEventListener('resize', resizeChart);
+  dataTimer = setInterval(updateData, 3000);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeChart);
+  if (dataTimer) clearInterval(dataTimer);
+  if (chart.value) {
+    chart.value.dispose();
+    chart.value = null;
+  }
+});
+
 </script>
 
 <style lang="scss" scoped>

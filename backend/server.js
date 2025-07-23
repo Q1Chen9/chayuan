@@ -327,6 +327,22 @@ app.get('/api/leaf-grade-stats', (req, res) => {
     });
 });
 
+app.post('/api/tasks', (req, res) => {
+    const { name, area, type, assignedUser } = req.body;
+    if (!name || !area || !type || !assignedUser) {
+        return res.status(400).send('Missing required fields');
+    }
+
+    const query = 'INSERT INTO detection_tasks (name, area, type, assignedUser) VALUES (?, ?, ?, ?)';
+    db.query(query, [name, area, type, assignedUser], (err, result) => {
+        if (err) {
+            console.error('Database error:', err);
+            return res.status(500).send('Error creating task');
+        }
+        res.status(201).send({ id: result.insertId, ...req.body });
+    });
+});
+
 
 app.get('/api/severity-stats', (req, res) => {
     const getCountsQuery = `

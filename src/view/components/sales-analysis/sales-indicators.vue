@@ -19,11 +19,11 @@
                 <i :class="item.icon"></i>
               </div>
               <div class="item-info">
-                <div class="item-value">{{ item.value }}</div>
+                <div class="item-value">{{ getDisplayValue(item) }}</div>
                 <div class="item-name">{{ item.name }}</div>
                 <div class="item-trend" :class="item.trend > 0 ? 'up' : 'down'">
                   <i class="fas" :class="item.trend > 0 ? 'fa-caret-up' : 'fa-caret-down'"></i>
-                  {{ Math.abs(item.trend) }}%
+                  {{ Math.round(Math.abs(item.trend)) }}%
                 </div>
               </div>
             </div>
@@ -34,11 +34,11 @@
                 <i :class="item.icon"></i>
               </div>
               <div class="item-info">
-                <div class="item-value">{{ item.value }}</div>
+                <div class="item-value">{{ getDisplayValue(item) }}</div>
                 <div class="item-name">{{ item.name }}</div>
                 <div class="item-trend" :class="item.trend > 0 ? 'up' : 'down'">
                   <i class="fas" :class="item.trend > 0 ? 'fa-caret-up' : 'fa-caret-down'"></i>
-                  {{ Math.abs(item.trend) }}%
+                  {{ Math.round(Math.abs(item.trend)) }}%
                 </div>
               </div>
             </div>
@@ -73,7 +73,7 @@
                   <i :class="item.icon"></i>
                 </div>
                 <div class="item-info">
-                  <div class="item-value">{{ item.value }}</div>
+                  <div class="item-value">{{ getDisplayValue(item) }}</div>
                   <div class="item-name">{{ item.name }}</div>
                 </div>
               </div>
@@ -88,7 +88,7 @@
                   <i :class="item.icon"></i>
                 </div>
                 <div class="item-info">
-                  <div class="item-value">{{ item.value }}</div>
+                  <div class="item-value">{{ getDisplayValue(item) }}</div>
                   <div class="item-name">{{ item.name }}</div>
                 </div>
               </div>
@@ -103,7 +103,7 @@
                   <i :class="item.icon"></i>
                 </div>
                 <div class="item-info">
-                  <div class="item-value">{{ item.value }}</div>
+                  <div class="item-value">{{ getDisplayValue(item) }}</div>
                   <div class="item-name">{{ item.name }}</div>
                 </div>
               </div>
@@ -116,27 +116,28 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
+import dayjs from 'dayjs';
 
-// 当前时间
-const currentTime = ref('2025-04-01 10:30');
-
-// 当前选中的渠道标签
+const currentTime = ref(dayjs().format('YYYY-MM-DD HH:mm:ss'));
+let timer = null;
 const activeChannel = ref(0);
 
-// 总数据
+const formatNumber = (num) => {
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
+
 const totalData = ref([
-  { name: '销售金额', value: '¥1,238,560', trend: 8.5, icon: 'fas fa-yuan-sign' },
-  { name: '销售单量', value: '12,385', trend: 6.8, icon: 'fas fa-shopping-cart' },
-  { name: '浏览人数', value: '235,689', trend: 12.4, icon: 'fas fa-eye' },
-  { name: '点击人数', value: '89,754', trend: 9.2, icon: 'fas fa-mouse-pointer' },
-  { name: '点击率', value: '38.1%', trend: -2.3, icon: 'fas fa-percentage' },
-  { name: '转化率', value: '13.8%', trend: 5.6, icon: 'fas fa-exchange-alt' },
-  { name: '客单价', value: '¥98.5', trend: 1.7, icon: 'fas fa-tag' },
-  { name: '复购率', value: '32.6%', trend: 3.9, icon: 'fas fa-redo' }
+  { name: '销售金额', value: 1238560, trend: 8.5, icon: 'fas fa-money-bill-wave', unit: '¥' },
+  { name: '销售单量', value: 12385, trend: 6.8, icon: 'fas fa-shopping-cart', unit: '' },
+  { name: '浏览人数', value: 235689, trend: 12.4, icon: 'fas fa-eye', unit: '' },
+  { name: '点击人数', value: 89754, trend: 9.2, icon: 'fas fa-mouse-pointer', unit: '' },
+  { name: '点击率', value: 38.1, trend: -2.3, icon: 'fas fa-percentage', unit: '%' },
+  { name: '转化率', value: 13.8, trend: 5.6, icon: 'fas fa-exchange-alt', unit: '%' },
+  { name: '客单价', value: 98.5, trend: 1.7, icon: 'fas fa-tag', unit: '¥' },
+  { name: '复购率', value: 32.6, trend: 3.9, icon: 'fas fa-redo', unit: '%' }
 ]);
 
-// 渠道
 const channels = ref([
   { name: '全部', icon: 'fas fa-globe' },
   { name: '淘宝', icon: 'fab fa-alipay' },
@@ -144,61 +145,84 @@ const channels = ref([
   { name: '拼多多', icon: 'fas fa-tags' }
 ]);
 
-// 添加图标到渠道数据
-const addIconsToChannelData = () => {
-  const icons = ['fas fa-yuan-sign', 'fas fa-shopping-cart', 'fas fa-eye', 'fas fa-mouse-pointer', 
+const initialChannelData = () => {
+  const icons = ['fas fa-money-bill-wave', 'fas fa-shopping-cart', 'fas fa-eye', 'fas fa-mouse-pointer',
                 'fas fa-percentage', 'fas fa-exchange-alt', 'fas fa-tag', 'fas fa-redo'];
-                
   return [
-    {
-      name: '淘宝',
-      data: [
-        { name: '销售金额', value: '¥658,325', trend: 7.2, icon: icons[0] },
-        { name: '销售单量', value: '6,854', trend: 5.3, icon: icons[1] },
-        { name: '浏览人数', value: '125,478', trend: 10.8, icon: icons[2] },
-        { name: '点击人数', value: '48,965', trend: 8.1, icon: icons[3] },
-        { name: '点击率', value: '39.0%', trend: -1.8, icon: icons[4] },
-        { name: '转化率', value: '14.0%', trend: 6.2, icon: icons[5] },
-        { name: '客单价', value: '¥96.0', trend: 1.9, icon: icons[6] },
-        { name: '复购率', value: '34.8%', trend: 4.5, icon: icons[7] }
-      ]
-    },
-    {
-      name: '京东',
-      data: [
-        { name: '销售金额', value: '¥428,965', trend: 9.8, icon: icons[0] },
-        { name: '销售单量', value: '3,965', trend: 8.4, icon: icons[1] },
-        { name: '浏览人数', value: '75,369', trend: 14.6, icon: icons[2] },
-        { name: '点击人数', value: '28,452', trend: 11.3, icon: icons[3] },
-        { name: '点击率', value: '37.8%', trend: -3.1, icon: icons[4] },
-        { name: '转化率', value: '13.9%', trend: 4.8, icon: icons[5] },
-        { name: '客单价', value: '¥108.2', trend: 1.4, icon: icons[6] },
-        { name: '复购率', value: '30.5%', trend: 2.7, icon: icons[7] }
-      ]
-    },
-    {
-      name: '拼多多',
-      data: [
-        { name: '销售金额', value: '¥151,270', trend: 15.6, icon: icons[0] },
-        { name: '销售单量', value: '1,566', trend: 12.9, icon: icons[1] },
-        { name: '浏览人数', value: '34,842', trend: 18.2, icon: icons[2] },
-        { name: '点击人数', value: '12,337', trend: 14.8, icon: icons[3] },
-        { name: '点击率', value: '35.4%', trend: -3.5, icon: icons[4] },
-        { name: '转化率', value: '12.7%', trend: 9.2, icon: icons[5] },
-        { name: '客单价', value: '¥86.5', trend: 2.7, icon: icons[6] },
-        { name: '复购率', value: '26.3%', trend: 5.8, icon: icons[7] }
-      ]
-    }
+    { name: '淘宝', data: [
+      { name: '销售金额', value: 658325, trend: 7.2, icon: icons[0], unit: '¥' },
+      { name: '销售单量', value: 6854, trend: 5.3, icon: icons[1], unit: '' },
+      { name: '浏览人数', value: 125478, trend: 10.8, icon: icons[2], unit: '' },
+      { name: '点击人数', value: 48965, trend: 8.1, icon: icons[3], unit: '' },
+      { name: '点击率', value: 39.0, trend: -1.8, icon: icons[4], unit: '%' },
+      { name: '转化率', value: 14.0, trend: 6.2, icon: icons[5], unit: '%' },
+      { name: '客单价', value: 96.0, trend: 1.9, icon: icons[6], unit: '¥' },
+      { name: '复购率', value: 34.8, trend: 4.5, icon: icons[7], unit: '%' }
+    ]},
+    { name: '京东', data: [
+      { name: '销售金额', value: 428965, trend: 9.8, icon: icons[0], unit: '¥' },
+      { name: '销售单量', value: 3965, trend: 8.4, icon: icons[1], unit: '' },
+      { name: '浏览人数', value: 75369, trend: 14.6, icon: icons[2], unit: '' },
+      { name: '点击人数', value: 28452, trend: 11.3, icon: icons[3], unit: '' },
+      { name: '点击率', value: 37.8, trend: -3.1, icon: icons[4], unit: '%' },
+      { name: '转化率', value: 13.9, trend: 4.8, icon: icons[5], unit: '%' },
+      { name: '客单价', value: 108.2, trend: 1.4, icon: icons[6], unit: '¥' },
+      { name: '复购率', value: 30.5, trend: 2.7, icon: icons[7], unit: '%' }
+    ]},
+    { name: '拼多多', data: [
+      { name: '销售金额', value: 151270, trend: 15.6, icon: icons[0], unit: '¥' },
+      { name: '销售单量', value: 1566, trend: 12.9, icon: icons[1], unit: '' },
+      { name: '浏览人数', value: 34842, trend: 18.2, icon: icons[2], unit: '' },
+      { name: '点击人数', value: 12337, trend: 14.8, icon: icons[3], unit: '' },
+      { name: '点击率', value: 35.4, trend: -3.5, icon: icons[4], unit: '%' },
+      { name: '转化率', value: 12.7, trend: 9.2, icon: icons[5], unit: '%' },
+      { name: '客单价', value: 86.5, trend: 2.7, icon: icons[6], unit: '¥' },
+      { name: '复购率', value: 26.3, trend: 5.8, icon: icons[7], unit: '%' }
+    ]}
   ];
 };
 
-// 初始化渠道数据
-const channelData = ref(addIconsToChannelData());
+const channelData = ref(initialChannelData());
 
-// 移除远程 FontAwesome 引用
+const getDisplayValue = (item) => {
+  if (item.unit === '¥') {
+    return `${item.unit}${formatNumber(Math.round(item.value))}`;
+  }
+  if (item.unit === '%') {
+    return `${Math.round(item.value)}${item.unit}`;
+  }
+  return formatNumber(Math.round(item.value));
+};
+
+const updateData = () => {
+  currentTime.value = dayjs().format('YYYY-MM-DD HH:mm:ss');
+  
+  const updateItem = (item) => {
+    let changeFactor = 0.005;
+    if (item.name.includes('率')) changeFactor = 0.001;
+
+    const change = (Math.random() - 0.45) * item.value * changeFactor;
+    item.value += change;
+    item.trend += (Math.random() - 0.5) * 0.2;
+    if (item.trend > 20) item.trend = 20;
+    if (item.trend < -20) item.trend = -20;
+    return item;
+  };
+
+  totalData.value.forEach(updateItem);
+  channelData.value.forEach(channel => {
+    channel.data.forEach(updateItem);
+  });
+};
+
 onMounted(() => {
-  // 其他初始化代码...
+  timer = setInterval(updateData, 2000);
 });
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer);
+});
+
 </script>
 
 <style lang="scss" scoped>

@@ -91,123 +91,161 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: "MonitorSoilParams",
-  data() {
-    return {
-      currentTime: "2025-04-01 10:30",
-      soilParams: [
-        {
-          title: "氮含量",
-          subtitle: "有效态",
-          value: "128",
-          unit: "mg/kg",
-          min: "50",
-          max: "200",
-          ideal: { min: 100, max: 150 },
-          warning: { min: 80, max: 180 },
-          icon: "fas fa-leaf",
-          class: "nitrogen"
-        },
-        {
-          title: "磷含量",
-          subtitle: "有效态",
-          value: "35.4",
-          unit: "mg/kg",
-          min: "10",
-          max: "60",
-          ideal: { min: 30, max: 45 },
-          warning: { min: 20, max: 55 },
-          icon: "fas fa-atom",
-          class: "phosphorus"
-        },
-        {
-          title: "钾含量",
-          subtitle: "速效态",
-          value: "185",
-          unit: "mg/kg",
-          min: "100",
-          max: "300",
-          ideal: { min: 150, max: 250 },
-          warning: { min: 120, max: 280 },
-          icon: "fas fa-tint",
-          class: "potassium"
-        },
-        {
-          title: "PH值",
-          subtitle: "酸碱度",
-          value: "7.6",
-          unit: "",
-          min: "5.0",
-          max: "9.0",
-          ideal: { min: 6.0, max: 7.0 },
-          warning: { min: 5.5, max: 8.0 },
-          icon: "fas fa-flask",
-          class: "ph"
-        }
-      ]
-    };
+<script setup>
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import dayjs from 'dayjs';
+
+const currentTime = ref(dayjs().format('YYYY-MM-DD HH:mm:ss'));
+const healthIndex = ref(85);
+const soilParams = ref([
+  {
+    title: "氮含量",
+    subtitle: "有效态",
+    value: "128",
+    unit: "mg/kg",
+    min: "50",
+    max: "200",
+    ideal: { min: 100, max: 150 },
+    warning: { min: 80, max: 180 },
+    icon: "fas fa-leaf",
+    class: "nitrogen"
   },
-  methods: {
-    formatDateTime(date) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      
-      return `${year}-${month}-${day} ${hours}:${minutes}`;
-    },
-    getPercentage(item) {
-      const value = parseFloat(item.value);
-      const min = parseFloat(item.min);
-      const max = parseFloat(item.max);
-      return ((value - min) / (max - min)) * 100;
-    },
-    getGradient(item) {
-      const value = parseFloat(item.value);
-      
-      if (value >= item.ideal.min && value <= item.ideal.max) {
-        // 理想范围内
-        return 'linear-gradient(90deg, #23fdc0 0%, #47C8FF 100%)';
-      } else if (value >= item.warning.min && value <= item.warning.max) {
-        // 警告范围内
-        return 'linear-gradient(90deg, #FFBA5A 0%, #FFE45A 100%)';
-      } else {
-        // 超出警告范围
-        return 'linear-gradient(90deg, #FF5370 0%, #ff8f70 100%)';
-      }
-    },
-    getStatusClass(item) {
-      const value = parseFloat(item.value);
-      
-      if (value >= item.ideal.min && value <= item.ideal.max) {
-        return 'status-ideal';
-      } else if (value >= item.warning.min && value <= item.warning.max) {
-        return 'status-warning';
-      } else {
-        return 'status-danger';
-      }
-    },
-    getStatusText(item) {
-      const value = parseFloat(item.value);
-      
-      if (value >= item.ideal.min && value <= item.ideal.max) {
-        return '正常';
-      } else if (value >= item.warning.min && value <= item.warning.max) {
-        if (value < item.ideal.min) {
-          return '略低';
-        } else {
-          return '略高';
-        }
-      } else {
-        if (value < item.warning.min) {
-          return '偏低';
-        } else {
-          return '偏高';
-        }
-      }
+  {
+    title: "磷含量",
+    subtitle: "有效态",
+    value: "35.4",
+    unit: "mg/kg",
+    min: "10",
+    max: "60",
+    ideal: { min: 30, max: 45 },
+    warning: { min: 20, max: 55 },
+    icon: "fas fa-atom",
+    class: "phosphorus"
+  },
+  {
+    title: "钾含量",
+    subtitle: "速效态",
+    value: "185",
+    unit: "mg/kg",
+    min: "100",
+    max: "300",
+    ideal: { min: 150, max: 250 },
+    warning: { min: 120, max: 280 },
+    icon: "fas fa-tint",
+    class: "potassium"
+  },
+  {
+    title: "PH值",
+    subtitle: "酸碱度",
+    value: "7.6",
+    unit: "",
+    min: "5.0",
+    max: "9.0",
+    ideal: { min: 6.0, max: 7.0 },
+    warning: { min: 5.5, max: 8.0 },
+    icon: "fas fa-flask",
+    class: "ph"
+  }
+]);
+
+let timer = null;
+
+const updateData = () => {
+  currentTime.value = dayjs().format('YYYY-MM-DD HH:mm:ss');
+  
+  soilParams.value = soilParams.value.map(param => {
+    let value = parseFloat(param.value);
+    const min = parseFloat(param.min);
+    const max = parseFloat(param.max);
+    const range = max - min;
+    
+    // Simulate smaller, more realistic fluctuations
+    const change = (Math.random() - 0.5) * (range * 0.02); 
+    value += change;
+    
+    // Ensure value stays within bounds
+    value = Math.max(min, Math.min(max, value));
+    
+    return {
+      ...param,
+      value: param.unit === 'mg/kg' ? Math.round(value) : value.toFixed(1)
+    };
+  });
+
+  // Recalculate health index based on new values
+  const totalScore = soilParams.value.reduce((acc, item) => {
+    const value = parseFloat(item.value);
+    const idealMin = item.ideal.min;
+    const idealMax = item.ideal.max;
+    // Simple scoring: 100 if in ideal range, 50 if in warning, 0 otherwise
+    if (value >= idealMin && value <= idealMax) {
+      return acc + 100;
+    } else if (value >= item.warning.min && value <= item.warning.max) {
+      return acc + 50;
+    }
+    return acc;
+  }, 0);
+  healthIndex.value = Math.round(totalScore / soilParams.value.length);
+};
+
+onMounted(() => {
+  timer = setInterval(updateData, 2500);
+});
+
+onBeforeUnmount(() => {
+  if (timer) clearInterval(timer);
+});
+
+const getPercentage = (item) => {
+  const value = parseFloat(item.value);
+  const min = parseFloat(item.min);
+  const max = parseFloat(item.max);
+  return ((value - min) / (max - min)) * 100;
+};
+
+const getGradient = (item) => {
+  const value = parseFloat(item.value);
+  
+  if (value >= item.ideal.min && value <= item.ideal.max) {
+    // 理想范围内
+    return 'linear-gradient(90deg, #23fdc0 0%, #47C8FF 100%)';
+  } else if (value >= item.warning.min && value <= item.warning.max) {
+    // 警告范围内
+    return 'linear-gradient(90deg, #FFBA5A 0%, #FFE45A 100%)';
+  } else {
+    // 超出警告范围
+    return 'linear-gradient(90deg, #FF5370 0%, #ff8f70 100%)';
+  }
+};
+
+const getStatusClass = (item) => {
+  const value = parseFloat(item.value);
+  
+  if (value >= item.ideal.min && value <= item.ideal.max) {
+    return 'status-ideal';
+  } else if (value >= item.warning.min && value <= item.warning.max) {
+    return 'status-warning';
+  } else {
+    return 'status-danger';
+  }
+};
+
+const getStatusText = (item) => {
+  const value = parseFloat(item.value);
+  
+  if (value >= item.ideal.min && value <= item.ideal.max) {
+    return '正常';
+  } else if (value >= item.warning.min && value <= item.warning.max) {
+    if (value < item.ideal.min) {
+      return '略低';
+    } else {
+      return '略高';
+    }
+  } else {
+    if (value < item.warning.min) {
+      return '偏低';
+    } else {
+      return '偏高';
     }
   }
 };

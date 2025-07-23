@@ -3,7 +3,7 @@
     <div class="rating-section">
       <div class="rating-chart">
         <div class="chart-value">
-          <span class="value">{{ ratingData.goodRating }}%</span>
+          <span class="value">{{ goodRating }}%</span>
           <span class="label">好评率</span>
         </div>
         <div class="chart-ring">
@@ -35,17 +35,17 @@
         <div class="detail-item">
           <div class="item-label">好评</div>
           <div class="item-value">{{ ratingData.good }}</div>
-          <div class="item-percentage positive">{{ ratingData.goodRating }}%</div>
+          <div class="item-percentage positive">{{ goodRating }}%</div>
         </div>
         <div class="detail-item">
           <div class="item-label">中评</div>
           <div class="item-value">{{ ratingData.neutral }}</div>
-          <div class="item-percentage neutral">{{ ratingData.neutralRating }}%</div>
+          <div class="item-percentage neutral">{{ neutralRating }}%</div>
         </div>
         <div class="detail-item">
           <div class="item-label">差评</div>
           <div class="item-value">{{ ratingData.bad }}</div>
-          <div class="item-percentage negative">{{ ratingData.badRating }}%</div>
+          <div class="item-percentage negative">{{ badRating }}%</div>
         </div>
       </div>
     </div>
@@ -66,30 +66,59 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 
-// 评价数据
 const ratingData = ref({
   good: 8740,
   neutral: 978,
-  bad: 235,
-  goodRating: 88,
-  neutralRating: 10,
-  badRating: 2
+  bad: 235
 });
 
-// 计算环形图进度
-const dashOffset = computed(() => {
-  const perimeter = 2 * Math.PI * 54; // 2π × 半径
-  return perimeter * (1 - ratingData.value.goodRating / 100);
-});
-
-// 差评关键词
 const badKeywords = ref([
   { keyword: '价格高', count: 58, percentage: 100 },
   { keyword: '泡后苦涩', count: 45, percentage: 77.6 },
   { keyword: '送货慢', count: 36, percentage: 62.1 }
 ]);
+
+let dataTimer = null;
+
+const totalReviews = computed(() => ratingData.value.good + ratingData.value.neutral + ratingData.value.bad);
+const goodRating = computed(() => Math.round((ratingData.value.good / totalReviews.value) * 100));
+const neutralRating = computed(() => Math.round((ratingData.value.neutral / totalReviews.value) * 100));
+const badRating = computed(() => Math.round((ratingData.value.bad / totalReviews.value) * 100));
+
+const dashOffset = computed(() => {
+  const perimeter = 2 * Math.PI * 54;
+  return perimeter * (1 - goodRating.value / 100);
+});
+
+const updateData = () => {
+  ratingData.value.good += Math.floor(Math.random() * 5);
+  ratingData.value.neutral += Math.floor(Math.random() * 2 - 0.5);
+  ratingData.value.bad += Math.floor(Math.random() * 1.2 - 0.1);
+  
+  ratingData.value.neutral = Math.max(0, ratingData.value.neutral);
+  ratingData.value.bad = Math.max(0, ratingData.value.bad);
+  
+  badKeywords.value = badKeywords.value.map(kw => {
+    const change = Math.floor(Math.random() * 3 - 1);
+    return { ...kw, count: Math.max(10, kw.count + change) };
+  }).sort((a,b) => b.count - a.count);
+  
+  const maxCount = badKeywords.value[0].count;
+  badKeywords.value.forEach(kw => {
+    kw.percentage = (kw.count / maxCount) * 100;
+  });
+};
+
+onMounted(() => {
+  dataTimer = setInterval(updateData, 3500);
+});
+
+onBeforeUnmount(() => {
+  if (dataTimer) clearInterval(dataTimer);
+});
+
 </script>
 
 <style lang="scss" scoped>

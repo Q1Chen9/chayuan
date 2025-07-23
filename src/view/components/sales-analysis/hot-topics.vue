@@ -16,11 +16,11 @@
             </span>
             <span class="topic-engagement">
               <i class="fas fa-fire"></i>
-              {{ item.engagement }}万
+              {{ Math.round(item.engagement) }}万
             </span>
             <span class="topic-trend" :class="item.trend > 0 ? 'up' : 'down'">
               <i class="fas" :class="item.trend > 0 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
-              {{ Math.abs(item.trend) }}%
+              {{ Math.round(Math.abs(item.trend)) }}%
             </span>
           </div>
         </div>
@@ -30,84 +30,55 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import dayjs from 'dayjs';
 
-// 当前时间
-const currentTime = ref('04-01 10:30');
+const currentTime = ref(dayjs().format('YYYY-MM-DD HH:mm:ss'));
+let dataTimer = null;
 
-// 来源图标映射
 const sourceIconMap = {
   '微博': 'fab fa-weibo',
-  '知乎': 'fas fa-z',
+  '知乎': 'fab fa-zhihu',
   '抖音': 'fab fa-tiktok',
   '小红书': 'fas fa-book',
-  '淘宝': 'fas fa-shopping-bag',
+  '淘宝': 'fab fa-taobao',
   '百度': 'fab fa-baidu'
 };
 
-// 热门话题数据
 const topicsList = ref([
-  {
-    title: '明前龙井开采，茶农凌晨采摘西湖龙井',
-    source: '微博',
-    engagement: 1853.6,
-    trend: 126
-  },
-  {
-    title: '狮峰龙井与西湖龙井，真的有差别吗？',
-    source: '知乎',
-    engagement: 1245.8,
-    trend: 58
-  },
-  {
-    title: '龙井茶正确冲泡方法及保存技巧',
-    source: '小红书',
-    engagement: 965.3,
-    trend: 42
-  },
-  {
-    title: '杭州西湖景区茶园开放，游客可体验采茶',
-    source: '微博',
-    engagement: 763.9,
-    trend: 39
-  },
-  {
-    title: '如何鉴别真假西湖龙井茶？专家教你5招',
-    source: '百度',
-    engagement: 582.6,
-    trend: 12
-  },
-  {
-    title: '龙井43号与传统龙井，风味差异分析',
-    source: '知乎',
-    engagement: 438.2,
-    trend: -8
-  },
-  {
-    title: '西湖龙井价格为何如此之高？探访龙井茶价格形成因素',
-    source: '淘宝',
-    engagement: 392.5,
-    trend: 15
-  },
-  {
-    title: '茶艺师现场演示：一杯好龙井的品鉴要点',
-    source: '抖音',
-    engagement: 328.7,
-    trend: 24
-  },
-  {
-    title: '今年明前龙井产量下降20%，价格上涨30%',
-    source: '微博',
-    engagement: 276.9,
-    trend: 62
-  },
-  {
-    title: '西湖龙井与碧螺春、铁观音口感对比',
-    source: '小红书',
-    engagement: 218.4,
-    trend: -5
-  }
+  { title: '明前龙井开采，茶农凌晨采摘西湖龙井', source: '微博', engagement: 1853.6, trend: 126 },
+  { title: '狮峰龙井与西湖龙井，真的有差别吗？', source: '知乎', engagement: 1245.8, trend: 58 },
+  { title: '龙井茶正确冲泡方法及保存技巧', source: '小红书', engagement: 965.3, trend: 42 },
+  { title: '杭州西湖景区茶园开放，游客可体验采茶', source: '微博', engagement: 763.9, trend: 39 },
+  { title: '如何鉴别真假西湖龙井茶？专家教你5招', source: '百度', engagement: 582.6, trend: 12 },
+  { title: '龙井43号与传统龙井，风味差异分析', source: '知乎', engagement: 438.2, trend: -8 },
+  { title: '西湖龙井价格为何如此之高？探访龙井茶价格形成因素', source: '淘宝', engagement: 392.5, trend: 15 },
+  { title: '茶艺师现场演示：一杯好龙井的品鉴要点', source: '抖音', engagement: 328.7, trend: 24 },
+  { title: '今年明前龙井产量下降20%，价格上涨30%', source: '微博', engagement: 276.9, trend: 62 },
+  { title: '西湖龙井与碧螺春、铁观音口感对比', source: '小红书', engagement: 218.4, trend: -5 }
 ]);
+
+const updateData = () => {
+  currentTime.value = dayjs().format('YYYY-MM-DD HH:mm:ss');
+  topicsList.value = topicsList.value.map(topic => {
+    const engagementChange = (Math.random() - 0.4) * topic.engagement * 0.02;
+    const trendChange = (Math.random() - 0.5) * 5;
+    return {
+      ...topic,
+      engagement: Math.max(100, topic.engagement + engagementChange),
+      trend: topic.trend + trendChange
+    };
+  }).sort((a, b) => b.engagement - a.engagement);
+};
+
+onMounted(() => {
+  dataTimer = setInterval(updateData, 3000);
+});
+
+onBeforeUnmount(() => {
+  if (dataTimer) clearInterval(dataTimer);
+});
+
 </script>
 
 <style lang="scss" scoped>

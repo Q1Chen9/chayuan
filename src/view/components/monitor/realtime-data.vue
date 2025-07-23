@@ -174,6 +174,42 @@ const weatherCodeMap = {
     96: '雷暴伴有小冰雹', 99: '雷暴伴有大冰雹',
 };
 
+const generateSuggestions = (currentData) => {
+    const newSuggestions = [];
+    const { temperature_2m, relative_humidity_2m, precipitation, wind_speed_10m } = currentData;
+
+    // Temperature-based suggestions
+    if (temperature_2m > 30) {
+        newSuggestions.push({ icon: 'fas fa-temperature-arrow-up', text: '气温较高，注意增加灌溉，防止茶树日灼' });
+    } else if (temperature_2m < 10) {
+        newSuggestions.push({ icon: 'fas fa-temperature-arrow-down', text: '气温较低，注意防范晚霜冻害' });
+    } else {
+        newSuggestions.push({ icon: 'fas fa-thermometer-half', text: '当前温度适宜茶树生长' });
+    }
+
+    // Humidity and precipitation suggestions
+    if (precipitation > 0) {
+        newSuggestions.push({ icon: 'fas fa-cloud-showers-heavy', text: `正在下雨 (${precipitation}mm)，请关注排水情况` });
+    } else if (relative_humidity_2m < 40) {
+        newSuggestions.push({ icon: 'fas fa-hand-holding-water', text: '空气干燥，请适时增加浇水' });
+    }
+
+    // Wind speed suggestions
+    if (wind_speed_10m > 15) {
+        newSuggestions.push({ icon: 'fas fa-wind', text: '风力较强，请检查茶棚等设施的稳固性' });
+    }
+    
+    // Fill up to 3 suggestions if needed
+    if (newSuggestions.length < 3 && relative_humidity_2m > 80) {
+         newSuggestions.push({ icon: 'fas fa-virus-covid', text: '湿度较高，注意预防病虫害' });
+    }
+    if (newSuggestions.length < 3) {
+        newSuggestions.push({ icon: 'fas fa-seedling', text: '环境良好，请继续保持' });
+    }
+
+    suggestions.value = newSuggestions.slice(0, 3);
+};
+
 const getWeatherDescription = (code) => weatherCodeMap[code] || '未知';
 
 function formatTime(date) {
@@ -337,6 +373,7 @@ watch(() => props.weatherData, (newVal) => {
       }
       
       weatherDescription.value = `${getWeatherDescription(code)} ${currentTemp}°C`;
+      generateSuggestions(newVal.current);
     }
   }
 }, { immediate: true, deep: true });

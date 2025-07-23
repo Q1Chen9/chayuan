@@ -80,16 +80,96 @@
             <h3>快速操作</h3>
           </div>
           <div class="action-buttons">
-            <button class="action-btn" @click="newMonitoringTask"><i class="fas fa-plus"></i> 新建监测任务</button>
-            <button class="action-btn" @click="exportWarningReport"><i class="fas fa-file-export"></i> 导出预警报告</button>
-            <button class="action-btn" @click="pushWarningNotification"><i class="fas fa-bell"></i> 推送预警通知</button>
-            <button class="action-btn" @click="manageWarningRules"><i class="fas fa-gear"></i> 管理预警规则</button>
+            <button class="action-btn" @click="activeModal = 'newTask'"><i class="fas fa-plus"></i> 新建监测任务</button>
+            <button class="action-btn" @click="activeModal = 'exportReport'"><i class="fas fa-file-export"></i> 导出预警报告</button>
+            <button class="action-btn" @click="activeModal = 'pushNotification'"><i class="fas fa-bell"></i> 推送预警通知</button>
+            <button class="action-btn" @click="activeModal = 'manageRules'"><i class="fas fa-gear"></i> 管理预警规则</button>
           </div>
         </div>
       </div>
     </div>
     <div class="footerbg wow fadeInUp"></div>
     <Pop :show="showPopup" :content="popupContent" @close="showPopup = false" />
+    
+    <!-- Modals for Quick Actions -->
+    <Modal :show="activeModal === 'newTask'" @close="activeModal = null" title="新建监测任务">
+      <form @submit.prevent="submitNewTask" class="modal-form">
+        <div class="form-group">
+          <label for="taskName">任务名称</label>
+          <input type="text" id="taskName" v-model="newTask.name" required>
+        </div>
+        <div class="form-group">
+          <label for="taskArea">监测区域</label>
+          <select id="taskArea" v-model="newTask.area" required>
+            <option disabled value="">请选择区域</option>
+            <option>茶园A区</option>
+            <option>茶园B区</option>
+            <option>茶园C区</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="taskType">监测类型</label>
+          <select id="taskType" v-model="newTask.type" required>
+            <option disabled value="">请选择类型</option>
+            <option>病虫害监测</option>
+            <option>茶叶分级</option>
+            <option>环境监测</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="taskUser">指派给</label>
+          <select id="taskUser" v-model="newTask.assignedUser" required>
+            <option disabled value="">请选择用户</option>
+            <option v-for="user in userDetections" :key="user.name" :value="user.name">{{ user.name }}</option>
+          </select>
+        </div>
+      </form>
+      <template #footer>
+        <button class="btn-primary" @click="submitNewTask">创建任务</button>
+      </template>
+    </Modal>
+
+    <Modal :show="activeModal === 'exportReport'" @close="activeModal = null" title="导出预警报告">
+      <p>请选择您想导出的报告格式：</p>
+      <div class="export-options">
+        <button class="export-btn" @click="exportWarningReport('txt')">.txt 格式</button>
+        <button class="export-btn" @click="exportWarningReport('csv')">.csv 格式</button>
+      </div>
+      <template #footer></template> <!-- Hide default footer -->
+    </Modal>
+    
+    <Modal :show="activeModal === 'pushNotification'" @close="activeModal = null" title="推送预警通知">
+      <div v-if="pestWarnings.length > 0">
+        <p>将向所有相关人员推送以下最新紧急预警：</p>
+        <div class="notification-content">
+          <strong>{{ pestWarnings[0].name }} ({{ pestWarnings[0].level }})</strong>
+          <p><i class="fas fa-location-dot"></i> {{ pestWarnings[0].area }}</p>
+          <p><i class="fas fa-clock"></i> {{ formatTime(pestWarnings[0].time) }}</p>
+        </div>
+      </div>
+      <div v-else>
+        <p>当前没有新的预警信息可以推送。</p>
+      </div>
+      <template #footer>
+        <button v-if="pestWarnings.length > 0" class="btn-primary" @click="confirmPushNotification">确认推送</button>
+        <button v-else class="btn-primary" @click="activeModal = null">关闭</button>
+      </template>
+    </Modal>
+    
+    <Modal :show="activeModal === 'manageRules'" @close="activeModal = null" title="管理预警规则">
+      <div class="rules-management">
+        <div class="rule-item" v-for="(rule, index) in warningRules" :key="index">
+          <span>当 <strong>{{ rule.condition }}</strong> 预警时,</span>
+          <span>执行操作: <strong>{{ rule.action }}</strong></span>
+          <button class="btn-toggle" :class="{ active: rule.enabled }" @click="rule.enabled = !rule.enabled">
+            {{ rule.enabled ? '已启用' : '已禁用' }}
+          </button>
+        </div>
+      </div>
+      <template #footer>
+        <button class="btn-primary" @click="activeModal = null">保存设置</button>
+      </template>
+    </Modal>
   </div>
 </template>
 
@@ -102,6 +182,7 @@ import SeverityLevelChart from './components/prediction/SeverityLevelChart.vue';
 import DetectionTrendChart from './components/prediction/DetectionTrendChart.vue';
 import LeafGradeChart from './components/prediction/LeafGradeChart.vue';
 import Pop from '../components/pop/pop.vue';
+import Modal from '../components/common/Modal.vue';
 
 export default {
   name: 'Prediction',
@@ -112,6 +193,7 @@ export default {
     DetectionTrendChart,
     LeafGradeChart,
     Pop,
+    Modal,
   },
   setup() {
     const pestWarnings = ref([]);
@@ -123,6 +205,13 @@ export default {
     const leafGradeTotal = ref(0);
     const showPopup = ref(false);
     const popupContent = ref('');
+    const activeModal = ref(null);
+    const newTask = ref({ name: '', area: '', type: '', assignedUser: '' });
+    const warningRules = ref([
+      { condition: '紧急', action: '短信通知', enabled: true },
+      { condition: '高', action: 'App推送', enabled: true },
+      { condition: '中', action: '邮件提醒', enabled: false },
+    ]);
     const detectionTrend = ref({
       labels: [],
       values: [],
@@ -196,43 +285,64 @@ export default {
     };
 
     const newMonitoringTask = () => {
-      console.log('"新建监测任务" button clicked. Implementation pending.');
-      alert('“新建监测任务”功能正在开发中。');
+      activeModal.value = 'newTask';
     };
 
-    const exportWarningReport = () => {
-      let reportContent = "实时预警报告\n\n";
-      reportContent += "========================================\n\n";
-      
-      pestWarnings.value.forEach(warning => {
-        reportContent += `预警名称: ${warning.name}\n`;
-        reportContent += `预警等级: ${warning.level}\n`;
-        reportContent += `发生区域: ${warning.area}\n`;
-        reportContent += `发生时间: ${warning.time}\n`;
-        reportContent += `处理建议: ${warning.suggestion}\n`;
-        reportContent += "----------------------------------------\n";
-      });
-
-      const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `预警报告-${new Date().toISOString().split('T')[0]}.txt`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-    };
-
-    const pushWarningNotification = () => {
-      if (pestWarnings.value.length > 0) {
-        const latestWarning = pestWarnings.value[0];
-        alert(`新预警通知:\n\n名称: ${latestWarning.name}\n等级: ${latestWarning.level}\n区域: ${latestWarning.area}`);
+    const submitNewTask = async () => {
+      if (newTask.value.name && newTask.value.area && newTask.value.type && newTask.value.assignedUser) {
+        try {
+          await axios.post('http://localhost:3000/api/tasks', newTask.value);
+          alert(`已成功创建新任务并指派给 ${newTask.value.assignedUser}`);
+          newTask.value = { name: '', area: '', type: '', assignedUser: '' }; // Reset form
+          activeModal.value = null;
+        } catch (error) {
+          console.error('Failed to create task:', error);
+          alert('创建任务失败，请稍后重试。');
+        }
       } else {
-        alert("当前无新预警。");
+        alert('请填写所有任务信息。');
       }
     };
 
+    const exportWarningReport = (format) => {
+      let reportContent = "实时预警报告\n\n========================================\n\n";
+      let fileExtension = 'txt';
+      let mimeType = 'text/plain;charset=utf-8';
+
+      if (format === 'csv') {
+        reportContent = "预警名称,预警等级,发生区域,发生时间,处理建议\n";
+        pestWarnings.value.forEach(w => {
+          reportContent += `"${w.name}","${w.level}","${w.area}","${w.time}","${w.suggestion.replace(/"/g, '""')}"\n`;
+        });
+        fileExtension = 'csv';
+        mimeType = 'text/csv;charset=utf-8';
+      } else {
+        pestWarnings.value.forEach(w => {
+          reportContent += `预警名称: ${w.name}\n预警等级: ${w.level}\n发生区域: ${w.area}\n发生时间: ${w.time}\n处理建议: ${w.suggestion}\n----------------------------------------\n`;
+        });
+      }
+
+      const blob = new Blob([reportContent], { type: mimeType });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `预警报告-${new Date().toISOString().split('T')[0]}.${fileExtension}`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      activeModal.value = null;
+    };
+
+    const pushWarningNotification = () => {
+      activeModal.value = 'pushNotification';
+    };
+
+    const confirmPushNotification = () => {
+      const latestWarning = pestWarnings.value[0];
+      alert(`已向相关人员推送通知:\n\n名称: ${latestWarning.name}\n等级: ${latestWarning.level}\n区域: ${latestWarning.area}`);
+      activeModal.value = null;
+    };
+
     const manageWarningRules = () => {
-      console.log('"管理预警规则" button clicked. Implementation pending.');
-      alert('“管理预警规则”功能正在开发中。');
+      activeModal.value = 'manageRules';
     };
 
 
@@ -259,6 +369,11 @@ export default {
       showFullSuggestion,
       pestTotal,
       leafGradeTotal,
+      activeModal,
+      newTask,
+      submitNewTask,
+      warningRules,
+      confirmPushNotification,
     };
   }
 }
@@ -487,5 +602,83 @@ export default {
   position: absolute;
   bottom: 10px;
   left:0;
+}
+
+.modal-form {
+  .form-group {
+    margin-bottom: 15px;
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(71, 200, 255, 0.5);
+      background-color: rgba(6, 30, 65, 0.9);
+      color: #d5f1f8;
+      font-size: 14px;
+    }
+  }
+}
+
+.export-options {
+  display: flex;
+  gap: 15px;
+  .export-btn {
+    flex: 1;
+    padding: 10px;
+    background-color: rgba(71, 200, 255, 0.1);
+    border: 1px solid rgba(71, 200, 255, 0.3);
+    color: #d5f1f8;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    &:hover {
+      background-color: rgba(71, 200, 255, 0.2);
+    }
+  }
+}
+
+.notification-content {
+  background-color: rgba(71, 200, 255, 0.1);
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 10px;
+  border-left: 3px solid #23fdc0;
+  p {
+    margin: 5px 0;
+  }
+}
+
+.rules-management {
+  .rule-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(71, 200, 255, 0.2);
+    &:last-child {
+      border-bottom: none;
+    }
+    .btn-toggle {
+      padding: 5px 10px;
+      border-radius: 15px;
+      cursor: pointer;
+      border: 1px solid;
+      background: transparent;
+      &.active {
+        color: #23fdc0;
+        border-color: #23fdc0;
+        background-color: rgba(35, 253, 192, 0.1);
+      }
+      &:not(.active) {
+        color: #aaccdd;
+        border-color: #aaccdd;
+      }
+    }
+  }
 }
 </style> 
