@@ -131,78 +131,71 @@ app.get('/', (req, res) => {
 
 // New API endpoints based on yolodatabase
 app.get('/api/warnings', (req, res) => {
-  // 1. Get counts for each disease type (excluding '健康')
-  const getCountsQuery = `
-      SELECT label, COUNT(*) as count 
-      FROM imgrecords 
-      WHERE label NOT LIKE '%健康%' 
-      GROUP BY label
-  `;
+    // 1. Get counts for each disease type (excluding '健康')
+    const getCountsQuery = `
+        SELECT label, COUNT(*) as count 
+        FROM imgrecords 
+        WHERE label NOT LIKE '%健康%' 
+        GROUP BY label
+    `;
 
-  db.query(getCountsQuery, (err, countResults) => {
-      if (err) {
-          res.status(500).send('Error fetching disease counts');
-          return;
-      }
+    db.query(getCountsQuery, (err, countResults) => {
+        if (err) {
+            return res.status(500).send('Error fetching disease counts');
+        }
 
-      const diseaseCounts = {};
-      countResults.forEach(row => {
-          try {
-              const label = JSON.parse(row.label)[0];
-              if (label && label !== '健康') {
-                  diseaseCounts[label] = row.count;
-              }
-          } catch (e) {
-            if (row.label && row.label !== '健康') {
-              diseaseCounts[row.label] = row.count;
+        const diseaseCounts = {};
+        countResults.forEach(row => {
+            let label;
+            try {
+                label = JSON.parse(row.label)[0];
+            } catch (e) {
+                label = row.label;
             }
-          }
-      });
+            if (label && label !== '健康') {
+                diseaseCounts[label] = row.count;
+            }
+        });
 
-      // 2. Define warning level thresholds based on counts
-      const getLevel = (count) => {
-          if (count > 20) return '紧急';
-          if (count > 10) return '高';
-          if (count > 5) return '中';
-          return '低';
-      };
+        const getLevel = (count) => {
+            if (count > 20) return '紧急';
+            if (count > 10) return '高';
+            if (count > 5) return '中';
+            return '低';
+        };
 
-      // 3. Fetch the latest 30 warnings
-      db.query('SELECT * FROM imgrecords ORDER BY id DESC LIMIT 30', (err, results) => {
-          if (err) {
-              res.status(500).send('Error fetching warnings from imgrecords');
-              return;
-          }
+        // 3. Fetch the latest warnings from imgrecords, excluding '健康'
+        db.query("SELECT * FROM imgrecords WHERE label NOT LIKE '%健康%' ORDER BY id DESC LIMIT 30", (err, results) => {
+            if (err) {
+                return res.status(500).send('Error fetching warnings from imgrecords');
+            }
 
-          // 4. Map results to warning format, using counts to determine level
-          const warnings = results.map((record, index) => {
-              let label;
-              try {
-                  label = JSON.parse(record.label)[0];
-              } catch (e) {
-                  label = record.label;
-              }
+            const warnings = results.map((record, index) => {
+                let label;
+                try {
+                    label = JSON.parse(record.label)[0];
+                } catch (e) {
+                    label = record.label;
+                }
 
-              if (!label || label === '健康') {
-                  return null; // This will be filtered out
-              }
+                if (!label) return null;
 
-              const count = diseaseCounts[label] || 0;
-              const level = getLevel(count);
+                const count = diseaseCounts[label] || 0;
 
-              return {
-                  id: record.id,
-                  name: label,
-                  level: level,
-                  area: `区域${index + 1}`, // Placeholder for area
-                  time: record.start_time,
-                  suggestion: record.suggestion || '暂无建议'
-              };
-          }).filter(item => item !== null); // Filter out nulls (e.g., '健康' records)
-          
-          res.json(warnings);
-      });
-  });
+                return {
+                    id: record.id,
+                    name: label,
+                    level: getLevel(count),
+                    area: `茶园${(record.id % 3) + 1}区`, // Placeholder for area
+                    time: record.start_time,
+                    suggestion: record.suggestion || '暂无建议',
+                    user: record.username || '未知用户'
+                };
+            }).filter(item => item !== null);
+
+            res.json(warnings);
+        });
+    });
 });
 
 app.get('/api/user-detections', (req, res) => {

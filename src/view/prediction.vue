@@ -17,6 +17,7 @@
               </div>
               <div class="warning-details">
                 <span><i class="fas fa-location-dot"></i> {{ warning.area }}</span>
+                <span><i class="fas fa-user"></i> {{ warning.user }}</span>
                 <span><i class="fas fa-clock"></i> {{ formatTime(warning.time) }}</span>
               </div>
               <div 
