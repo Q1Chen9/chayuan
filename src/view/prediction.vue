@@ -19,8 +19,13 @@
                 <span><i class="fas fa-location-dot"></i> {{ warning.area }}</span>
                 <span><i class="fas fa-clock"></i> {{ formatTime(warning.time) }}</span>
               </div>
-              <div class="warning-suggestion" @click="showFullSuggestion(warning.suggestion, $event)">
-                <i class="fas fa-lightbulb"></i> {{ stripMarkdown(warning.suggestion) }}
+              <div 
+                class="warning-suggestion" 
+                :class="{ 'expanded': expandedSuggestionId === warning.id }"
+                @click="toggleSuggestion(warning.id)"
+              >
+                <i class="fas fa-lightbulb"></i> 
+                {{ stripMarkdown(warning.suggestion) }}
               </div>
             </li>
           </ul>
@@ -30,13 +35,7 @@
             <i class="fas fa-users"></i>
             <h3>用户检测排行</h3>
           </div>
-          <ul class="user-list">
-            <li v-for="(user, index) in userDetections" :key="user.name">
-              <span class="rank-number">{{ index + 1 }}</span>
-              <span class="user-name">{{ user.name }}</span>
-              <span class="detection-count">{{ user.count }} 次</span>
-            </li>
-          </ul>
+          <UserRankingChart :chartData="userDetections" />
         </div>
       </div>
 
@@ -89,7 +88,6 @@
       </div>
     </div>
     <div class="footerbg wow fadeInUp"></div>
-    <Pop :show="showPopup" :content="popupContent" @close="showPopup = false" />
     
     <!-- Modals for Quick Actions -->
     <Modal :show="activeModal === 'newTask'" @close="activeModal = null" title="新建监测任务">
@@ -157,31 +155,83 @@
     </Modal>
     
     <Modal :show="activeModal === 'manageRules'" @close="activeModal = null" title="管理预警规则">
-      <div class="rules-management">
-        <div class="rule-item" v-for="(rule, index) in warningRules" :key="index">
-          <span>当 <strong>{{ rule.condition }}</strong> 预警时,</span>
-          <span>执行操作: <strong>{{ rule.action }}</strong></span>
-          <button class="btn-toggle" :class="{ active: rule.enabled }" @click="rule.enabled = !rule.enabled">
-            {{ rule.enabled ? '已启用' : '已禁用' }}
-          </button>
+      <div class="rules-management-container">
+        <!-- Threshold Settings -->
+        <div class="rules-section">
+          <h4 class="rules-header">
+            <i class="fas fa-tachometer-alt"></i> 预警等级阈值
+          </h4>
+          <div class="modal-form">
+            <div class="threshold-settings">
+              <div class="form-group">
+                <label for="critical-threshold">紧急 ( > )</label>
+                <input type="number" id="critical-threshold" v-model.number="warningSettings.warningThresholds.critical">
+              </div>
+              <div class="form-group">
+                <label for="high-threshold">高 ( > )</label>
+                <input type="number" id="high-threshold" v-model.number="warningSettings.warningThresholds.high">
+              </div>
+              <div class="form-group">
+                <label for="medium-threshold">中 ( > )</label>
+                <input type="number" id="medium-threshold" v-model.number="warningSettings.warningThresholds.medium">
+              </div>
+              <div class="form-group">
+                <label>低</label>
+                <span class="threshold-value">( &lt;= {{ warningSettings.warningThresholds.medium }} )</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notification Rules -->
+        <div class="rules-section">
+          <h4 class="rules-header">
+            <i class="fas fa-bell"></i> 通知规则与人员
+          </h4>
+          <div class="notification-rules">
+            <div class="rule-item" v-for="rule in warningSettings.notificationRules" :key="rule.condition">
+              <div class="rule-main">
+                <span class="rule-condition">当 <strong>{{ rule.condition }}</strong> 预警时</span>
+                <span class="rule-action">执行: <strong>{{ rule.action }}</strong></span>
+                <button class="btn-toggle" :class="{ active: rule.enabled }" @click="rule.enabled = !rule.enabled">
+                  {{ rule.enabled ? '已启用' : '已禁用' }}
+                </button>
+              </div>
+              <div class="rule-users">
+                <label>通知人员:</label>
+                <div class="user-tags">
+                  <span v-for="user in rule.assignedUsers" :key="user" class="user-tag">
+                    {{ user }} <i class="fas fa-times" @click="removeUserFromRule(rule, user)"></i>
+                  </span>
+                </div>
+                <div class="user-assignment">
+                  <select v-model="selectedUser[rule.condition]">
+                    <option value="">添加用户</option>
+                    <option v-for="user in availableUsers(rule)" :key="user.name" :value="user.name">{{ user.name }}</option>
+                  </select>
+                  <button @click="addUserToRule(rule, selectedUser[rule.condition])" :disabled="!selectedUser[rule.condition]">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <template #footer>
-        <button class="btn-primary" @click="activeModal = null">保存设置</button>
+        <button class="btn-primary" @click="saveWarningSettings">保存设置</button>
       </template>
     </Modal>
   </div>
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import top from "./components/top/index.vue";
 import PestDistributionChart from './components/prediction/PestDistributionChart.vue';
 import SeverityLevelChart from './components/prediction/SeverityLevelChart.vue';
 import DetectionTrendChart from './components/prediction/DetectionTrendChart.vue';
 import LeafGradeChart from './components/prediction/LeafGradeChart.vue';
-import Pop from '../components/pop/pop.vue';
+import UserRankingChart from './components/prediction/UserRankingChart.vue';
 import Modal from '../components/common/Modal.vue';
 
 export default {
@@ -192,7 +242,7 @@ export default {
     SeverityLevelChart,
     DetectionTrendChart,
     LeafGradeChart,
-    Pop,
+    UserRankingChart,
     Modal,
   },
   setup() {
@@ -203,15 +253,15 @@ export default {
     const leafGradeStats = ref([]);
     const pestTotal = ref(0);
     const leafGradeTotal = ref(0);
-    const showPopup = ref(false);
-    const popupContent = ref('');
     const activeModal = ref(null);
+    const expandedSuggestionId = ref(null);
     const newTask = ref({ name: '', area: '', type: '', assignedUser: '' });
-    const warningRules = ref([
-      { condition: '紧急', action: '短信通知', enabled: true },
-      { condition: '高', action: 'App推送', enabled: true },
-      { condition: '中', action: '邮件提醒', enabled: false },
-    ]);
+    const warningSettings = ref({
+      warningThresholds: { critical: 0, high: 0, medium: 0 },
+      notificationRules: [],
+    });
+    const selectedUser = ref({});
+    
     const detectionTrend = ref({
       labels: [],
       values: [],
@@ -244,6 +294,19 @@ export default {
       }
     };
 
+    const fetchWarningSettings = async () => {
+      try {
+        const res = await axios.get('http://localhost:3000/api/warning-settings');
+        warningSettings.value = res.data;
+        // Initialize selectedUser for each rule
+        res.data.notificationRules.forEach(rule => {
+          selectedUser.value[rule.condition] = '';
+        });
+      } catch (error) {
+        console.error('Failed to fetch warning settings:', error);
+      }
+    };
+
     const getWarningClass = (level) => {
       switch (level) {
         case '紧急': return 'level-critical';
@@ -267,9 +330,12 @@ export default {
       return date.toLocaleDateString();
     }
 
-    const showFullSuggestion = (suggestion, event) => {
-      popupContent.value = suggestion;
-      showPopup.value = true;
+    const toggleSuggestion = (warningId) => {
+      if (expandedSuggestionId.value === warningId) {
+        expandedSuggestionId.value = null;
+      } else {
+        expandedSuggestionId.value = warningId;
+      }
     };
 
     const stripMarkdown = (text) => {
@@ -280,8 +346,7 @@ export default {
         .replace(/\*/g, '')       // remove italic
         .replace(/-\s/g, '')       // remove list dashes
         .replace(/`/g, '')        // remove backticks
-        .replace(/\\n/g, ' ')     // replace escaped newlines with space
-        .replace(/\n/g, ' ');      // replace newlines with space
+        .replace(/\\n/g, '\n');    // replace escaped newlines with actual newlines
     };
 
     const newMonitoringTask = () => {
@@ -319,7 +384,7 @@ export default {
       } else {
         pestWarnings.value.forEach(w => {
           reportContent += `预警名称: ${w.name}\n预警等级: ${w.level}\n发生区域: ${w.area}\n发生时间: ${w.time}\n处理建议: ${w.suggestion}\n----------------------------------------\n`;
-        });
+      });
       }
 
       const blob = new Blob([reportContent], { type: mimeType });
@@ -336,13 +401,40 @@ export default {
     };
 
     const confirmPushNotification = () => {
-      const latestWarning = pestWarnings.value[0];
+        const latestWarning = pestWarnings.value[0];
       alert(`已向相关人员推送通知:\n\n名称: ${latestWarning.name}\n等级: ${latestWarning.level}\n区域: ${latestWarning.area}`);
       activeModal.value = null;
     };
 
     const manageWarningRules = () => {
+      fetchWarningSettings(); // Fetch latest settings when opening modal
       activeModal.value = 'manageRules';
+    };
+
+    const saveWarningSettings = async () => {
+      try {
+        await axios.post('http://localhost:3000/api/warning-settings', warningSettings.value);
+        alert('预警设置已保存！');
+        activeModal.value = null;
+      } catch (error) {
+        console.error('Failed to save warning settings:', error);
+        alert('保存失败，请稍后重试。');
+      }
+    };
+    
+    const availableUsers = (rule) => {
+      return userDetections.value.filter(u => !rule.assignedUsers.includes(u.name));
+    };
+
+    const addUserToRule = (rule, userName) => {
+      if (userName && !rule.assignedUsers.includes(userName)) {
+        rule.assignedUsers.push(userName);
+        selectedUser.value[rule.condition] = ''; // Reset dropdown
+      }
+    };
+
+    const removeUserFromRule = (rule, userName) => {
+      rule.assignedUsers = rule.assignedUsers.filter(u => u !== userName);
     };
 
 
@@ -363,17 +455,20 @@ export default {
       exportWarningReport,
       pushWarningNotification,
       manageWarningRules,
-      stripMarkdown,
-      showPopup,
-      popupContent,
-      showFullSuggestion,
       pestTotal,
       leafGradeTotal,
       activeModal,
       newTask,
       submitNewTask,
-      warningRules,
-      confirmPushNotification,
+      warningSettings,
+      saveWarningSettings,
+      selectedUser,
+      availableUsers,
+      addUserToRule,
+      removeUserFromRule,
+      expandedSuggestionId,
+      toggleSuggestion,
+      stripMarkdown,
     };
   }
 }
@@ -516,46 +611,17 @@ export default {
       text-overflow: ellipsis;
       white-space: normal;
       cursor: pointer;
+
+      &.expanded {
+        -webkit-line-clamp: unset;
+        white-space: pre-wrap;
+      }
     }
   }
   .level-critical { border-color: #FF5370; .warning-level { background: rgba(255, 83, 112, 0.2); color: #FF5370; } }
   .level-high { border-color: #FFBA5A; .warning-level { background: rgba(255, 186, 90, 0.2); color: #FFBA5A; } }
   .level-medium { border-color: #47C8FF; .warning-level { background: rgba(71, 200, 255, 0.2); color: #47C8FF; } }
   .level-low { border-color: #23fdc0; .warning-level { background: rgba(35, 253, 192, 0.2); color: #23fdc0; } }
-}
-
-.user-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  height: 100%;
-  overflow-y: auto;
-  &::-webkit-scrollbar { width: 4px; }
-  &::-webkit-scrollbar-track { background: rgba(213, 241, 248, 0.1); }
-  &::-webkit-scrollbar-thumb { background: rgba(71, 200, 255, 0.5); border-radius: 2px; }
-
-  li {
-    display: flex;
-    align-items: center;
-    padding: 12px 0;
-    border-bottom: 1px dashed rgba(71, 200, 255, 0.2);
-    &:last-child { border-bottom: none; }
-
-    .rank-number {
-      width: 24px; height: 24px;
-      border-radius: 50%;
-      background: rgba(35, 253, 192, 0.1);
-      color: #23fdc0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 12px;
-      margin-right: 15px;
-      flex-shrink: 0;
-    }
-    .user-name { flex: 1; font-size: 14px; color: rgba(213, 241, 248, 0.9); }
-    .detection-count { font-size: 14px; color: #47C8FF; font-weight: bold; }
-  }
 }
 
 .action-buttons {
@@ -677,6 +743,165 @@ export default {
       &:not(.active) {
         color: #aaccdd;
         border-color: #aaccdd;
+      }
+    }
+  }
+}
+
+.rules-management-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rules-section {
+  background: rgba(6, 30, 65, 0.7);
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid rgba(71, 200, 255, 0.2);
+}
+
+.rules-header {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 15px 0;
+  display: flex;
+  align-items: center;
+  i {
+    margin-right: 10px;
+    color: #23fdc0;
+  }
+}
+
+.threshold-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px 20px;
+
+  .form-group {
+    margin-bottom: 0;
+  }
+  
+  .threshold-value {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    color: #aaccdd;
+    padding-left: 10px;
+  }
+}
+
+.notification-rules {
+  .rule-item {
+    display: flex;
+    flex-direction: column;
+    padding: 15px 0;
+    border-bottom: 1px solid rgba(71, 200, 255, 0.2);
+    &:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+  }
+
+  .rule-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .rule-condition {
+    flex-basis: 30%;
+  }
+  .rule-action {
+    flex-basis: 30%;
+  }
+
+  .btn-toggle {
+    padding: 5px 10px;
+    border-radius: 15px;
+    cursor: pointer;
+    border: 1px solid;
+    background: transparent;
+    font-size: 12px;
+    &.active {
+      color: #23fdc0;
+      border-color: #23fdc0;
+      background-color: rgba(35, 253, 192, 0.1);
+    }
+    &:not(.active) {
+      color: #aaccdd;
+      border-color: #aaccdd;
+    }
+  }
+
+  .rule-users {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    label {
+      font-size: 14px;
+      color: #aaccdd;
+      flex-shrink: 0;
+    }
+  }
+
+  .user-tags {
+    flex-grow: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .user-tag {
+    background: rgba(71, 200, 255, 0.2);
+    color: #d5f1f8;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+
+    i {
+      margin-left: 6px;
+      cursor: pointer;
+      font-size: 10px;
+      &:hover {
+        color: #FF5370;
+      }
+    }
+  }
+
+  .user-assignment {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+
+    select {
+      max-width: 120px;
+      padding: 4px;
+      border-radius: 4px 0 0 4px;
+      border: 1px solid rgba(71, 200, 255, 0.5);
+      border-right: none;
+      background-color: rgba(6, 30, 65, 0.9);
+      color: #d5f1f8;
+      font-size: 12px;
+    }
+
+    button {
+      padding: 4px 8px;
+      border-radius: 0 4px 4px 0;
+      border: 1px solid rgba(71, 200, 255, 0.5);
+      background: rgba(71, 200, 255, 0.3);
+      color: #d5f1f8;
+      cursor: pointer;
+      &:hover {
+        background: rgba(71, 200, 255, 0.5);
+      }
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
     }
   }

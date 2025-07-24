@@ -166,11 +166,11 @@ const initChart = () => {
         }
       },
       data: salesData.value.map(item => ({
-        value: [item.unitPrice, item.sales, item.repurchaseRate],
-        platform: item.platform,
-        unitPrice: item.unitPrice,
-        sales: item.sales,
-        repurchaseRate: item.repurchaseRate
+          value: [item.unitPrice, item.sales, item.repurchaseRate],
+          platform: item.platform,
+          unitPrice: item.unitPrice,
+          sales: item.sales,
+          repurchaseRate: item.repurchaseRate
       }))
     }],
     legend: {

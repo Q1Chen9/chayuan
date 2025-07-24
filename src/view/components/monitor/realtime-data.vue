@@ -65,101 +65,101 @@ const props = defineProps({
 const currentTime = ref(formatTime(new Date()));
 const weatherDescription = ref('晴朗 23°C');
 const dataItems = ref([
-  {
-    title: '空气质量',
-    value: 45,
-    unit: 'AQI',
-    icon: 'fas fa-wind',
-    class: 'air',
-    max: 100,
-    min: 0,
-    danger: 75,
-    warning: 50,
-    trendIcon: 'fas fa-arrow-down',
-    trendValue: '5%',
-    trendClass: 'trend-down',
-    info: '空气质量良好，PM2.5低'
-  },
-  {
-    title: '二氧化碳',
-    value: 426,
-    unit: 'ppm',
-    icon: 'fas fa-smog',
-    class: 'co2',
-    max: 1000,
-    min: 300,
-    danger: 800,
-    warning: 600,
-    trendIcon: 'fas fa-arrow-up',
-    trendValue: '3%',
-    trendClass: 'trend-up',
-    info: '浓度在安全范围内'
-  },
-  {
-    title: '温度',
-    value: 24.5,
-    unit: '°C',
-    icon: 'fas fa-temperature-high',
-    class: 'temperature',
-    max: 40,
-    min: 0,
-    danger: 35,
-    warning: 30,
-    trendIcon: 'fas fa-arrow-up',
-    trendValue: '1.2°C',
-    trendClass: 'trend-up',
-    info: '适宜植物生长'
-  },
-  {
-    title: '湿度',
-    value: 68,
-    unit: '%',
-    icon: 'fas fa-tint',
-    class: 'humidity',
-    max: 100,
-    min: 0,
-    danger: 90,
-    warning: 80,
-    trendIcon: 'fas fa-arrow-down',
-    trendValue: '5%',
-    trendClass: 'trend-down',
-    info: '湿度适中，有利光合作用'
-  },
-  {
-    title: '光照强度',
-    value: 65,
-    unit: 'klux',
-    icon: 'fas fa-sun',
-    class: 'light',
-    max: 100,
-    min: 0,
-    danger: 85,
-    warning: 75,
-    trendIcon: 'fas fa-arrow-up',
-    trendValue: '15%',
-    trendClass: 'trend-up',
-    info: '建议适当遮阴'
-  },
-  {
-    title: '降雨量',
-    value: 0,
-    unit: 'mm',
-    icon: 'fas fa-cloud-rain',
-    class: 'rainfall',
-    max: 50,
-    min: 0,
-    danger: 30,
-    warning: 15,
-    trendIcon: 'fas fa-equals',
-    trendValue: '0mm',
-    trendClass: 'trend-steady',
-    info: '今日无降雨，建议浇水'
-  }
+        {
+          title: '空气质量',
+          value: 45,
+          unit: 'AQI',
+          icon: 'fas fa-wind',
+          class: 'air',
+          max: 100,
+          min: 0,
+          danger: 75,
+          warning: 50,
+          trendIcon: 'fas fa-arrow-down',
+          trendValue: '5%',
+          trendClass: 'trend-down',
+          info: '空气质量良好，PM2.5低'
+        },
+        {
+          title: '二氧化碳',
+          value: 426,
+          unit: 'ppm',
+          icon: 'fas fa-smog',
+          class: 'co2',
+          max: 1000,
+          min: 300,
+          danger: 800,
+          warning: 600,
+          trendIcon: 'fas fa-arrow-up',
+          trendValue: '3%',
+          trendClass: 'trend-up',
+          info: '浓度在安全范围内'
+        },
+        {
+          title: '温度',
+          value: 24.5,
+          unit: '°C',
+          icon: 'fas fa-temperature-high',
+          class: 'temperature',
+          max: 40,
+          min: 0,
+          danger: 35,
+          warning: 30,
+          trendIcon: 'fas fa-arrow-up',
+          trendValue: '1.2°C',
+          trendClass: 'trend-up',
+          info: '适宜植物生长'
+        },
+        {
+          title: '湿度',
+          value: 68,
+          unit: '%',
+          icon: 'fas fa-tint',
+          class: 'humidity',
+          max: 100,
+          min: 0,
+          danger: 90,
+          warning: 80,
+          trendIcon: 'fas fa-arrow-down',
+          trendValue: '5%',
+          trendClass: 'trend-down',
+          info: '湿度适中，有利光合作用'
+        },
+        {
+          title: '光照强度',
+          value: 65,
+          unit: 'klux',
+          icon: 'fas fa-sun',
+          class: 'light',
+          max: 100,
+          min: 0,
+          danger: 85,
+          warning: 75,
+          trendIcon: 'fas fa-arrow-up',
+          trendValue: '15%',
+          trendClass: 'trend-up',
+          info: '建议适当遮阴'
+        },
+        {
+          title: '降雨量',
+          value: 0,
+          unit: 'mm',
+          icon: 'fas fa-cloud-rain',
+          class: 'rainfall',
+          max: 50,
+          min: 0,
+          danger: 30,
+          warning: 15,
+          trendIcon: 'fas fa-equals',
+          trendValue: '0mm',
+          trendClass: 'trend-steady',
+          info: '今日无降雨，建议浇水'
+        }
 ]);
 const suggestions = ref([
-  { icon: 'fas fa-hand-holding-water', text: '今日晴朗，建议增加灌溉量，防止土壤水分流失' },
-  { icon: 'fas fa-umbrella-beach', text: '午后光照强，建议为幼苗提供遮阴' },
-  { icon: 'fas fa-bug', text: '气温回升，注意监测害虫活动' }
+        { icon: 'fas fa-hand-holding-water', text: '今日晴朗，建议增加灌溉量，防止土壤水分流失' },
+        { icon: 'fas fa-umbrella-beach', text: '午后光照强，建议为幼苗提供遮阴' },
+        { icon: 'fas fa-bug', text: '气温回升，注意监测害虫活动' }
 ]);
 
 let timeTimer = null;
@@ -216,8 +216,8 @@ function formatTime(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
   const seconds = String(date.getSeconds()).padStart(2, '0');
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }

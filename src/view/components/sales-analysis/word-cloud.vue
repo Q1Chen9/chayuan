@@ -120,7 +120,7 @@ const handleResize = () => {
 };
 
 onMounted(() => {
-  initWordCloudChart();
+    initWordCloudChart();
   dataTimer = setInterval(updateData, 5000); // Low update frequency
 });
 

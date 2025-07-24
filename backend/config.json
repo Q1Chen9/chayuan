@@ -1,0 +1,27 @@
+{
+  "warningThresholds": {
+    "critical": 20,
+    "high": 10,
+    "medium": 5
+  },
+  "notificationRules": [
+    {
+      "condition": "紧急",
+      "action": "短信通知",
+      "enabled": true,
+      "assignedUsers": []
+    },
+    {
+      "condition": "高",
+      "action": "App推送",
+      "enabled": true,
+      "assignedUsers": []
+    },
+    {
+      "condition": "中",
+      "action": "邮件提醒",
+      "enabled": false,
+      "assignedUsers": []
+    }
+  ]
+} 
