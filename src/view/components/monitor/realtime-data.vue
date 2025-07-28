@@ -399,7 +399,7 @@ watch(() => props.weatherData, (newVal) => {
             });
             if(currentRadiation && currentRadiation.net) {
               // 1 W/m² ~ 0.143 klux, 7 W/m² ~ 1 klux. We'll use a rough conversion.
-              newValue = parseFloat(currentRadiation.net) / 7;
+              newValue = Math.round(parseFloat(currentRadiation.net) / 7);
               info = `净辐射: ${currentRadiation.net} W/m²`;
             }
           }
@@ -407,6 +407,9 @@ watch(() => props.weatherData, (newVal) => {
         case '二氧化碳':
           // 和风天气无CO2，保持原值
           break;
+      }
+      if (item.title === '光照强度') {
+        newValue = Math.round(newValue);
       }
       newValue = Math.max(item.min, Math.min(item.max, parseFloat(newValue)));
       return { ...item, value: newValue, info };

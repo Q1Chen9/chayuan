@@ -125,6 +125,32 @@ db.connect(err => {
   });
 });
 
+let warningSettings = {
+    warningThresholds: { critical: 20, high: 10, medium: 5 },
+    notificationRules: [
+        { condition: '紧急', action: '邮件和短信通知', enabled: true, assignedUsers: ['张三', '李四'] },
+        { condition: '高', action: '邮件通知', enabled: true, assignedUsers: ['王五'] },
+        { condition: '中', action: '应用内通知', enabled: true, assignedUsers: ['赵六'] },
+        { condition: '低', action: '无需通知', enabled: false, assignedUsers: [] }
+    ]
+};
+
+app.get('/api/warning-settings', (req, res) => {
+    res.json(warningSettings);
+});
+
+app.post('/api/warning-settings', (req, res) => {
+    const newSettings = req.body;
+    if (newSettings && newSettings.warningThresholds && newSettings.notificationRules) {
+        warningSettings = newSettings;
+        // In a real app, you would save this to a database
+        res.status(200).send('Settings saved successfully');
+    } else {
+        res.status(400).send('Invalid settings format');
+    }
+});
+
+
 app.get('/', (req, res) => {
   res.send('Backend server is running!');
 });
@@ -133,34 +159,41 @@ app.get('/', (req, res) => {
 app.get('/api/warnings', (req, res) => {
     // 1. Get counts for each disease type (excluding '健康')
     const getCountsQuery = `
-        SELECT label, COUNT(*) as count 
+        SELECT label 
         FROM imgrecords 
-        WHERE label NOT LIKE '%健康%' 
-        GROUP BY label
+        WHERE label NOT LIKE '%健康%'
     `;
 
-    db.query(getCountsQuery, (err, countResults) => {
+    db.query(getCountsQuery, (err, allLabelRecords) => {
         if (err) {
             return res.status(500).send('Error fetching disease counts');
         }
 
         const diseaseCounts = {};
-        countResults.forEach(row => {
-            let label;
+        allLabelRecords.forEach(record => {
+            let labels = [];
             try {
-                label = JSON.parse(row.label)[0];
+                const parsed = JSON.parse(record.label);
+                if (Array.isArray(parsed)) {
+                    labels = parsed;
+                }
             } catch (e) {
-                label = row.label;
+                if (record.label) {
+                    labels.push(record.label);
+                }
             }
-            if (label && label !== '健康') {
-                diseaseCounts[label] = row.count;
-            }
+            
+            labels.forEach(label => {
+                if (label && label !== '健康') {
+                    diseaseCounts[label] = (diseaseCounts[label] || 0) + 1;
+                }
+            });
         });
 
         const getLevel = (count) => {
-            if (count > 20) return '紧急';
-            if (count > 10) return '高';
-            if (count > 5) return '中';
+            if (count > warningSettings.warningThresholds.critical) return '紧急';
+            if (count > warningSettings.warningThresholds.high) return '高';
+            if (count > warningSettings.warningThresholds.medium) return '中';
             return '低';
         };
 
@@ -338,18 +371,38 @@ app.post('/api/tasks', (req, res) => {
 
 
 app.get('/api/severity-stats', (req, res) => {
-    const getCountsQuery = `
-        SELECT label, COUNT(*) as count 
+    const getLabelsQuery = `
+        SELECT label
         FROM imgrecords 
-        WHERE label NOT LIKE '%健康%' 
-        GROUP BY label
+        WHERE label NOT LIKE '%健康%'
     `;
 
-    db.query(getCountsQuery, (err, countResults) => {
+    db.query(getLabelsQuery, (err, allLabelRecords) => {
         if (err) {
             res.status(500).send('Error fetching severity stats');
             return;
         }
+
+        const diseaseCounts = {};
+        allLabelRecords.forEach(record => {
+            let labels = [];
+            try {
+                const parsed = JSON.parse(record.label);
+                if (Array.isArray(parsed)) {
+                    labels = parsed;
+                }
+            } catch (e) {
+                if (record.label) {
+                    labels.push(record.label);
+                }
+            }
+            
+            labels.forEach(label => {
+                if (label && label !== '健康') {
+                    diseaseCounts[label] = (diseaseCounts[label] || 0) + 1;
+                }
+            });
+        });
 
         const stats = {
             '紧急': { name: '紧急', count: 0, color: '#FF5370' },
@@ -359,28 +412,16 @@ app.get('/api/severity-stats', (req, res) => {
         };
         
         const getLevel = (count) => {
-            if (count > 20) return '紧急';
-            if (count > 10) return '高';
-            if (count > 5) return '中';
+            if (count > warningSettings.warningThresholds.critical) return '紧急';
+            if (count > warningSettings.warningThresholds.high) return '高';
+            if (count > warningSettings.warningThresholds.medium) return '中';
             return '低';
         };
 
-        countResults.forEach(row => {
-            try {
-                const label = JSON.parse(row.label)[0];
-                if (label && label !== '健康') {
-                    const level = getLevel(row.count);
-                    if (stats[level]) {
-                        stats[level].count++;
-                    }
-                }
-            } catch (e) {
-              if (row.label && row.label !== '健康'){
-                const level = getLevel(row.count);
-                if (stats[level]) {
-                    stats[level].count++;
-                }
-              }
+        Object.values(diseaseCounts).forEach(count => {
+            const level = getLevel(count);
+            if (stats[level]) {
+                stats[level].count++;
             }
         });
 

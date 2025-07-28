@@ -417,6 +417,7 @@ export default {
         await axios.post('http://localhost:3000/api/warning-settings', warningSettings.value);
         alert('预警设置已保存！');
         activeModal.value = null;
+        fetchData();
       } catch (error) {
         console.error('Failed to save warning settings:', error);
         alert('保存失败，请稍后重试。');
