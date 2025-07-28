@@ -5,6 +5,7 @@
 <script setup>
 import * as echarts from 'echarts';
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+import dayjs from 'dayjs';
 
 const props = defineProps({
   weatherData: {
@@ -15,9 +16,8 @@ const props = defineProps({
 
 const chart = ref(null);
 const lightData = ref({
-  dates: ['-'],
-  intensity: [0],
-  duration: [0]
+  dates: [],
+  net: []
 });
 
 const initChart = () => {
@@ -36,6 +36,7 @@ const resizeChart = () => {
 
 const updateChart = () => {
   if (!chart.value) return;
+  chart.value.hideLoading();
   const option = {
     backgroundColor: 'transparent',
     tooltip: {
@@ -47,16 +48,14 @@ const updateChart = () => {
         let result = params[0].name + '<br/>';
         params.forEach(param => {
           let marker = `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${param.color};"></span>`;
-          let value = param.seriesName === '光照强度' ? 
-            param.value.toLocaleString() + ' lux' : 
-            param.value + ' 小时';
+          let value = param.value + ' W/m²';
           result += marker + param.seriesName + ': ' + value + '<br/>';
         });
         return result;
       }
     },
     legend: {
-      data: ['光照强度', '光照时长'],
+      data: ['净辐射'],
       textStyle: {
         color: '#d5f1f8'
       },
@@ -85,10 +84,8 @@ const updateChart = () => {
     yAxis: [
       {
         type: 'value',
-        name: '光照强度 (lux)',
+        name: '净辐射 (W/m²)',
         min: 0,
-        max: 100000,
-        interval: 20000,
         position: 'left',
         axisLine: {
           lineStyle: {
@@ -101,64 +98,23 @@ const updateChart = () => {
           }
         },
         axisLabel: {
-          formatter: function(value) {
-            return value / 1000 + 'k';
-          },
-          color: '#FFBA5A'
-        },
-        nameTextStyle: {
-          color: '#FFBA5A'
-        }
-      },
-      {
-        type: 'value',
-        name: '光照时长 (小时)',
-        min: 0,
-        max: 15,
-        interval: 3,
-        position: 'right',
-        axisLine: {
-          lineStyle: {
-            color: '#61E1FF'
-          }
-        },
-        splitLine: {
-          show: false
-        },
-        axisLabel: {
           formatter: '{value}',
-          color: '#61E1FF'
+          color: '#FFBA5A'
         },
         nameTextStyle: {
-          color: '#61E1FF'
+          color: '#FFBA5A'
         }
       }
     ],
     series: [
       {
-        name: '光照强度',
-        type: 'bar',
-        barWidth: '40%',
-        yAxisIndex: 0,
-        data: lightData.value.intensity,
-        itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(255, 186, 90, 0.9)' },
-            { offset: 1, color: 'rgba(255, 228, 90, 0.3)' }
-          ]),
-          borderRadius: [4, 4, 0, 0]
-        }
-      },
-      {
-        name: '光照时长',
+        name: '净辐射',
         type: 'line',
-        yAxisIndex: 1,
         smooth: true,
-        symbol: 'emptyCircle',
-        symbolSize: 8,
+        yAxisIndex: 0,
+        data: lightData.value.net,
         lineStyle: {
           width: 3,
-          type: 'solid',
           color: {
             type: 'linear',
             x: 0,
@@ -166,68 +122,48 @@ const updateChart = () => {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: '#61E1FF' },
-              { offset: 1, color: '#A09CFF' }
+              { offset: 0, color: '#FFBA5A' },
+              { offset: 1, color: '#FFE45A' }
             ]
           }
         },
-        itemStyle: {
-          color: '#61E1FF',
-          borderColor: '#fff',
-          borderWidth: 2
-        },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(97, 225, 255, 0.3)' },
-            { offset: 1, color: 'rgba(160, 156, 255, 0.1)' }
+            { offset: 0, color: 'rgba(255, 186, 90, 0.6)' },
+            { offset: 1, color: 'rgba(255, 228, 90, 0.2)' }
           ])
-        },
-        data: lightData.value.duration
+        }
       }
     ]
   };
-  chart.value.setOption(option);
+  chart.value.setOption(option, { notMerge: true });
 };
 
-watch(() => props.weatherData, (newVal) => {
-  if (newVal && newVal.daily && newVal.hourly) {
-    const dailyData = newVal.daily;
-    const hourlyData = newVal.hourly;
-    
-    lightData.value.dates = dailyData.time;
-    
-    // Calculate daily light duration
-    lightData.value.duration = dailyData.sunrise.map((sunrise, i) => {
-      const rise = new Date(sunrise);
-      const set = new Date(dailyData.sunset[i]);
-      return parseFloat(((set - rise) / (1000 * 60 * 60)).toFixed(1));
-    });
-
-    // Calculate average daily light intensity
-    let dailyIntensity = [];
-    dailyData.time.forEach((day, i) => {
-        const dayStart = new Date(day + "T00:00");
-        const dayEnd = new Date(day + "T23:59");
-        let dayTotalIntensity = 0;
-        let dayHours = 0;
-        hourlyData.time.forEach((h, j) => {
-            const hour = new Date(h);
-            if(hour >= dayStart && hour <= dayEnd && hourlyData.is_day[j]){
-                dayTotalIntensity += (70000 + (Math.random() - 0.5) * 20000);
-                dayHours++;
-            }
+const showNoDataMessage = () => {
+    if (chart.value) {
+        chart.value.showLoading('default', { 
+            text: '暂无光照预报数据', 
+            color: 'transparent', 
+            textColor: '#d5f1f8',
+            maskColor: 'rgba(6, 30, 65, 0.5)'
         });
-        dailyIntensity.push(dayHours > 0 ? Math.round(dayTotalIntensity / dayHours) : 0);
-    });
+    }
+}
 
-    lightData.value.intensity = dailyIntensity;
-    
+watch(() => props.weatherData, (newVal) => {
+  if (newVal && newVal.solarRadiation24h && newVal.solarRadiation24h.code === '200' && newVal.solarRadiation24h.radiation) {
+    const radiationData = newVal.solarRadiation24h.radiation;
+    lightData.value.dates = radiationData.map(r => dayjs(r.fxTime).format('HH:mm'));
+    lightData.value.net = radiationData.map(r => r.net);
     updateChart();
+  } else {
+    showNoDataMessage();
   }
 }, { immediate: true, deep: true });
 
 onMounted(() => {
   initChart();
+  showNoDataMessage();
   window.addEventListener('resize', resizeChart);
 });
 

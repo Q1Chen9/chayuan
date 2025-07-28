@@ -1,6 +1,9 @@
 <template>
   <div class="monitor">
     <top name="青芽智眸大数据智能运营平台"></top>
+    <div class="city-selector">
+      <input v-model="cityInput" @keyup.enter="handleCityChange" placeholder="输入城市后按回车切换" />
+    </div>
     <div class="monitormain">
       <!-- 左侧栏 - 原右侧栏内容 -->
       <div class="monitormainl">
@@ -89,18 +92,131 @@ import { gsap } from 'gsap';
 
 const weatherData = ref(null);
 let dataTimer = null;
+const cityInput = ref('');
+let currentLocationId = null;
+let currentLat = null;
+let currentLon = null;
 
-const fetchWeatherData = async (lat, lon) => {
-  try {
-    const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,is_day,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto`);
-    if (!response.ok) {
-      throw new Error('Weather data fetch failed');
-    }
-    const data = await response.json();
-    weatherData.value = data;
-  } catch (error) {
-    console.error("Failed to fetch weather data.", error);
+const QWEATHER_KEY = '9339ef6eff254f5ba087d791d6bc8423';
+const QWEATHER_HOST = 'pm2tundcmy.re.qweatherapi.com';
+
+// 经纬度转城市id
+async function fetchLocationId(lat, lon) {
+  const url = `https://${QWEATHER_HOST}/geo/v2/city/lookup?location=${lon},${lat}&key=${QWEATHER_KEY}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.code === '200' && data.location && data.location.length > 0) {
+    return data.location[0].id;
   }
+  throw new Error('获取城市ID失败');
+}
+
+// 获取实时天气
+async function fetchWeatherNow(locationId) {
+  const url = `https://${QWEATHER_HOST}/v7/weather/now?location=${locationId}&key=${QWEATHER_KEY}`;
+  const res = await fetch(url);
+  return await res.json();
+}
+
+// 获取实时空气质量
+async function fetchAirNow(locationId) {
+  const url = `https://${QWEATHER_HOST}/v7/air/now?location=${locationId}&key=${QWEATHER_KEY}`;
+  const res = await fetch(url);
+  return await res.json();
+}
+
+// 获取24小时温湿度
+async function fetchWeather24h(locationId) {
+  const url = `https://${QWEATHER_HOST}/v7/weather/24h?location=${locationId}&key=${QWEATHER_KEY}`;
+  const res = await fetch(url);
+  return await res.json();
+}
+
+// 获取5天空气质量
+async function fetchAir5d(locationId) {
+  const url = `https://${QWEATHER_HOST}/v7/air/5d?location=${locationId}&key=${QWEATHER_KEY}`;
+  const res = await fetch(url);
+  return await res.json();
+}
+
+// 获取24h太阳辐射 - 注意：此接口使用经纬度
+async function fetchSolarRadiation24h(lat, lon) {
+  const url = `https://${QWEATHER_HOST}/v7/solar-radiation/24h?location=${lon},${lat}&key=${QWEATHER_KEY}`;
+  const res = await fetch(url);
+  return await res.json();
+}
+
+// 城市名转locationId
+async function fetchLocationIdByName(cityName) {
+  const url = `https://${QWEATHER_HOST}/geo/v2/city/lookup?location=${encodeURIComponent(cityName)}&key=${QWEATHER_KEY}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.code === '200' && data.location && data.location.length > 0) {
+    return data.location[0].id;
+  }
+  throw new Error('未找到该城市');
+}
+
+// 核心数据获取逻辑
+async function fetchAllData(lat, lon) {
+  try {
+    const locationId = await fetchLocationId(lat, lon);
+    const [weather, air, weather24h, air5d, solarRadiation24h] = await Promise.all([
+      fetchWeatherNow(locationId),
+      fetchAirNow(locationId),
+      fetchWeather24h(locationId),
+      fetchAir5d(locationId),
+      fetchSolarRadiation24h(lat, lon) // 直接传递经纬度
+    ]);
+    // 适配hourly结构
+    let hourly = { time: [], temperature_2m: [], relative_humidity_2m: [] };
+    if (weather24h && weather24h.hourly && Array.isArray(weather24h.hourly)) {
+      hourly.time = weather24h.hourly.map(h => h.fxTime);
+      hourly.temperature_2m = weather24h.hourly.map(h => parseFloat(h.temp));
+      hourly.relative_humidity_2m = weather24h.hourly.map(h => parseFloat(h.humidity));
+    }
+    weatherData.value = { weather, air, hourly, air5d, solarRadiation24h };
+  } catch (e) {
+    console.error('获取和风天气数据失败', e);
+    weatherData.value = null;
+    }
+}
+
+// 处理城市切换
+const handleCityChange = async () => {
+  if (!cityInput.value) return;
+  try {
+    // 切换城市时，我们没有原始经纬度，可以先获取城市信息再获取天气
+    // 为了简化，我们暂时只更新ID依赖的数据，或需要更复杂的逻辑来获取新城市的经纬度
+    // 此处我们先获取ID，并用ID更新依赖ID的数据
+    const locationId = await fetchLocationIdByName(cityInput.value);
+    currentLocationId = locationId;
+    
+    // 由于太阳辐射需要经纬度，我们需要先获取新城市的经纬度
+    const cityLookupUrl = `https://${QWEATHER_HOST}/geo/v2/city/lookup?location=${encodeURIComponent(cityInput.value)}&key=${QWEATHER_KEY}`;
+    const cityRes = await fetch(cityLookupUrl);
+    const cityData = await cityRes.json();
+    if (cityData.code === '200' && cityData.location.length > 0) {
+        const { lat, lon } = cityData.location[0];
+        currentLat = lat;
+        currentLon = lon;
+        startDataUpdates();
+    } else {
+        throw new Error('无法获取新城市的经纬度');
+    }
+
+  } catch (error) {
+    alert('找不到城市，请检查输入是否正确。');
+    console.error(error);
+  }
+};
+
+// 封装启动更新的逻辑
+const startDataUpdates = () => {
+  if (!currentLocationId || currentLat === null || currentLon === null) return;
+  if (dataTimer) clearInterval(dataTimer);
+  fetchAllData(currentLat, currentLon);
+  dataTimer = setInterval(() => fetchAllData(currentLat, currentLon), 5 * 60 * 1000);
 };
 
 onMounted(() => {
@@ -110,26 +226,32 @@ onMounted(() => {
   });
   wow.init();
 
-  const startDataUpdates = (lat, lon) => {
-    fetchWeatherData(lat, lon);
-    dataTimer = setInterval(() => fetchWeatherData(lat, lon), 5 * 60 * 1000);
+  const initLocation = (lat, lon) => {
+    currentLat = lat;
+    currentLon = lon;
+    fetchLocationId(lat, lon).then(id => {
+      currentLocationId = id;
+      startDataUpdates();
+    }).catch(error => {
+        console.error("Failed to initialize location ID.", error);
+    });
   };
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        startDataUpdates(position.coords.latitude, position.coords.longitude);
+        initLocation(position.coords.latitude, position.coords.longitude);
       },
       (error) => {
         console.error("Geolocation error:", error.message, ". Using default location.");
         const hangzhou = { latitude: 30.2741, longitude: 120.1551 };
-        startDataUpdates(hangzhou.latitude, hangzhou.longitude);
+        initLocation(hangzhou.latitude, hangzhou.longitude);
       }
     );
   } else {
     console.log("Geolocation is not supported. Using default location.");
     const hangzhou = { latitude: 30.2741, longitude: 120.1551 };
-    startDataUpdates(hangzhou.latitude, hangzhou.longitude);
+    initLocation(hangzhou.latitude, hangzhou.longitude);
   }
 });
 
@@ -152,6 +274,32 @@ onBeforeUnmount(() => {
   flex-direction: column;
   background: url("../assets/bg.jpg");
   background-size: 100% 100%;
+}
+
+.city-selector {
+  position: absolute;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  input {
+    background: rgba(13, 42, 82, 0.8);
+    border: 1px solid rgba(71, 200, 255, 0.6);
+    color: #d5f1f8;
+    padding: 8px 15px;
+    border-radius: 20px;
+    text-align: center;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.3s ease;
+    &::placeholder {
+      color: rgba(213, 241, 248, 0.5);
+    }
+    &:focus {
+      border-color: #23fdc0;
+      box-shadow: 0 0 10px rgba(35, 253, 192, 0.3);
+    }
+  }
 }
 
 .monitormain {

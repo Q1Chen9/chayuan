@@ -82,8 +82,8 @@ const updateChart = () => {
           {
             type: 'value',
             name: '温度 (°C)',
-            min: 15,
-            max: 35,
+            min: 0,
+            max: 40,
             position: 'left',
             axisLine: {
               lineStyle: {
@@ -106,8 +106,8 @@ const updateChart = () => {
           {
             type: 'value',
             name: '湿度 (%)',
-            min: 30,
-            max: 90,
+            min: 0,
+            max: 100,
             position: 'right',
             axisLine: {
               lineStyle: {
@@ -203,22 +203,13 @@ const updateChart = () => {
 };
 
 watch(() => props.weatherData, (newVal) => {
-  if (newVal && newVal.hourly) {
+  if (newVal && newVal.hourly && Array.isArray(newVal.hourly.time) && newVal.hourly.time.length > 0) {
     const hourlyData = newVal.hourly;
-    const now = new Date();
-    const currentIndex = hourlyData.time.findIndex((t, i) => {
-        const timePoint = new Date(t);
-        const nextTimePoint = hourlyData.time[i+1] ? new Date(hourlyData.time[i+1]) : new Date(timePoint.getTime() + 3600 * 1000);
-        return now >= timePoint && now < nextTimePoint;
-    }) || hourlyData.time.length -1;
-
-    if (currentIndex > -1) {
-      const startIndex = Math.max(0, currentIndex - 2);
-      trendData.value.dates = hourlyData.time.slice(startIndex, currentIndex + 1).map(t => dayjs(t).format('HH:mm'));
-      trendData.value.temperature = hourlyData.temperature_2m.slice(startIndex, currentIndex + 1);
-      trendData.value.humidity = hourlyData.relative_humidity_2m.slice(startIndex, currentIndex + 1);
+    // 直接使用完整的24小时数据
+    trendData.value.dates = hourlyData.time.map(t => dayjs(t).format('HH:mm'));
+    trendData.value.temperature = hourlyData.temperature_2m;
+    trendData.value.humidity = hourlyData.relative_humidity_2m;
       updateChart();
-            }
           }
 }, { immediate: true, deep: true });
 

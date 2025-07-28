@@ -17,9 +17,7 @@ const props = defineProps({
 const chart = ref(null);
 const airData = ref({
   dates: ['-'],
-  aqi: [0],
-  pm25: [0],
-  pm10: [0]
+  aqi: [0]
 });
 
 const initChart = () => {
@@ -47,7 +45,7 @@ const updateChart = () => {
       }
     },
     legend: {
-      data: ['AQI', 'PM2.5', 'PM10'],
+      data: ['AQI'],
       textStyle: {
         color: '#d5f1f8'
       },
@@ -99,9 +97,6 @@ const updateChart = () => {
         type: 'line',
         smooth: true,
         data: airData.value.aqi,
-        itemStyle: {
-          color: '#47C8FF'
-        },
         lineStyle: {
           width: 3,
           color: {
@@ -117,38 +112,16 @@ const updateChart = () => {
           }
         },
         areaStyle: {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(71, 200, 255, 0.3)' },
-              { offset: 1, color: 'rgba(35, 253, 192, 0.1)' }
-            ]
-          }
-        }
+          opacity: 0.8,
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            {
+              offset: 0,
+              color: 'rgba(59, 147, 255, 0.4)'
       },
       {
-        name: 'PM2.5',
-        type: 'bar',
-        data: airData.value.pm25,
-        itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(104, 211, 145, 0.8)' },
-            { offset: 1, color: 'rgba(104, 211, 145, 0.1)' }
-          ])
-        }
-      },
-      {
-        name: 'PM10',
-        type: 'bar',
-        data: airData.value.pm10,
-        itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(255, 190, 65, 0.8)' },
-            { offset: 1, color: 'rgba(255, 190, 65, 0.1)' }
+              offset: 1,
+              color: 'rgba(74, 222, 222, 0.1)'
+            }
           ])
         }
       }
@@ -158,28 +131,11 @@ const updateChart = () => {
 };
 
 watch(() => props.weatherData, (newVal) => {
-  if (newVal && newVal.hourly) {
-    const hourlyData = newVal.hourly;
-    const now = new Date();
-    // Correctly find the current or last passed hour index
-    const currentIndex = hourlyData.time.findIndex((t, i) => {
-        const timePoint = new Date(t);
-        const nextTimePoint = hourlyData.time[i+1] ? new Date(hourlyData.time[i+1]) : new Date(timePoint.getTime() + 3600 * 1000);
-        return now >= timePoint && now < nextTimePoint;
-    }) || hourlyData.time.length -1;
-    
-    if (currentIndex > -1) {
-      const startIndex = Math.max(0, currentIndex - 2);
-      const time = hourlyData.time.slice(startIndex, currentIndex + 1).map(t => dayjs(t).format('HH:mm'));
-      const windSpeed = hourlyData.wind_speed_10m.slice(startIndex, currentIndex + 1);
-
-      airData.value.dates = time;
-      airData.value.aqi = windSpeed.map(ws => Math.max(0, 100 - ws * 5));
-      airData.value.pm25 = windSpeed.map(ws => Math.max(0, 50 - ws * 2.5));
-      airData.value.pm10 = windSpeed.map(ws => Math.max(0, 80 - ws * 4));
-
+  if (newVal && newVal.air5d && newVal.air5d.daily) {
+    const dailyData = newVal.air5d.daily;
+    airData.value.dates = dailyData.map(d => dayjs(d.fxDate).format('MM-DD'));
+    airData.value.aqi = dailyData.map(d => d.aqi);
       updateChart();
-    }
   }
 }, { immediate: true, deep: true });
 

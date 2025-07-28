@@ -360,21 +360,66 @@ const updateRealData = (weatherData) => {
 };
 
 watch(() => props.weatherData, (newVal) => {
-  if (newVal) {
-    updateRealData(newVal);
-     if (newVal.current && newVal.daily?.time.length > 0) {
-      const currentTemp = newVal.current.temperature_2m;
-      const today = new Date().toISOString().slice(0, 10);
-      const todayIndex = newVal.daily.time.findIndex(day => day === today);
-      
-      let code = -1;
-      if (todayIndex !== -1) {
-        code = newVal.daily.weather_code[todayIndex];
+  if (newVal && newVal.weather && newVal.weather.now && newVal.air && newVal.air.now) {
+    // 和风天气API数据适配
+    const now = newVal.weather.now;
+    const air = newVal.air.now;
+    dataItems.value = dataItems.value.map(item => {
+      let newValue = item.value;
+      let info = item.info;
+      switch(item.title) {
+        case '温度':
+          newValue = parseFloat(now.temp);
+          info = `体感: ${now.feelsLike}°C`;
+          break;
+        case '湿度':
+          newValue = parseFloat(now.humidity);
+          info = now.humidity > 70 ? '湿度较高' : '湿度适中';
+          break;
+        case '降雨量':
+          newValue = parseFloat(now.precip);
+          info = now.precip > 0 ? '正在下雨' : '今日无雨';
+          break;
+        case '空气质量':
+          newValue = parseFloat(air.aqi);
+          info = `PM2.5: ${air.pm2p5}`;
+          if (newVal.weather && newVal.weather.now) {
+            info += ` | ${now.windDir} ${now.windSpeed} km/h`;
+          }
+          break;
+        case '光照强度':
+          // 和风天气无光照，白天给高值，夜间低值
+          newValue = now.icon && now.icon.startsWith('1') ? 70 : 10;
+          info = now.text;
+          if (newVal.solarRadiation24h && newVal.solarRadiation24h.radiation) {
+            const currentRadiation = newVal.solarRadiation24h.radiation.find(r => {
+                const now = new Date();
+                const rTime = new Date(r.fxTime);
+                return now.getHours() === rTime.getHours();
+            });
+            if(currentRadiation && currentRadiation.net) {
+              // 1 W/m² ~ 0.143 klux, 7 W/m² ~ 1 klux. We'll use a rough conversion.
+              newValue = parseFloat(currentRadiation.net) / 7;
+              info = `净辐射: ${currentRadiation.net} W/m²`;
+            }
+          }
+          break;
+        case '二氧化碳':
+          // 和风天气无CO2，保持原值
+          break;
       }
-      
-      weatherDescription.value = `${getWeatherDescription(code)} ${currentTemp}°C`;
-      generateSuggestions(newVal.current);
-    }
+      newValue = Math.max(item.min, Math.min(item.max, parseFloat(newValue)));
+      return { ...item, value: newValue, info };
+    });
+    // 天气描述
+    weatherDescription.value = `${now.text} ${now.temp}°C`;
+    // 智能建议
+    generateSuggestions({
+      temperature_2m: parseFloat(now.temp),
+      relative_humidity_2m: parseFloat(now.humidity),
+      precipitation: parseFloat(now.precip),
+      wind_speed_10m: parseFloat(now.windSpeed)
+    });
   }
 }, { immediate: true, deep: true });
 
