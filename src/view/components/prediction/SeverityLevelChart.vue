@@ -13,6 +13,10 @@ export default {
       type: Array,
       required: true,
     },
+    thresholds: {
+      type: Object,
+      required: true,
+    },
   },
   setup(props) {
     const chart = ref(null);
@@ -38,10 +42,20 @@ export default {
             color: '#fff',
           },
         },
+        title: {
+            text: `阈值: 紧急 > ${props.thresholds.critical}, 高 > ${props.thresholds.high}, 中 > ${props.thresholds.medium}`,
+            left: 'center',
+            bottom: '2%',
+            textStyle: {
+                color: '#aaccdd',
+                fontSize: 12,
+                fontWeight: 'normal'
+            }
+        },
         grid: {
           left: '3%',
           right: '4%',
-          bottom: '3%',
+          bottom: '15%',
           containLabel: true,
         },
         xAxis: {

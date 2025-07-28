@@ -289,7 +289,7 @@ app.get('/api/pest-distribution', (req, res) => {
             }
             
             labels.forEach(label => {
-                if (label) {
+                if (label && label !== '健康') {
                     counts[label] = (counts[label] || 0) + 1;
                     totalDetections++;
                 }
@@ -425,7 +425,10 @@ app.get('/api/severity-stats', (req, res) => {
             }
         });
 
-        res.json(Object.values(stats));
+        res.json({
+            stats: Object.values(stats),
+            thresholds: warningSettings.warningThresholds
+        });
     });
 });
 
@@ -475,6 +478,47 @@ app.get('/api/detection-trend', (req, res) => {
         }
 
         res.json({ labels, values });
+    });
+});
+
+app.get('/api/health-stats', (req, res) => {
+    const query = `SELECT label FROM imgrecords`;
+    db.query(query, (err, results) => {
+        if (err) {
+            res.status(500).send('Error fetching health stats');
+            return;
+        }
+
+        let healthyCount = 0;
+        let unhealthyCount = 0;
+
+        results.forEach(record => {
+            let labels = [];
+            try {
+                const parsed = JSON.parse(record.label);
+                if (Array.isArray(parsed)) {
+                    labels = parsed;
+                }
+            } catch (e) {
+                if (record.label) {
+                    labels.push(record.label);
+                }
+            }
+            
+            const isUnhealthy = labels.some(l => l !== '健康' && l);
+            const isHealthy = labels.includes('健康') && !isUnhealthy;
+            
+            if (isHealthy) {
+                healthyCount++;
+            } else if (isUnhealthy) {
+                unhealthyCount++;
+            }
+        });
+
+        res.json([
+            { name: '健康', value: healthyCount, color: '#23fdc0' },
+            { name: '存在病害', value: unhealthyCount, color: '#FF5370' }
+        ]);
     });
 });
 

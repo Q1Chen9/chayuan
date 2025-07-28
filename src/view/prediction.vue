@@ -72,7 +72,14 @@
             <i class="fas fa-shield-halved"></i>
             <h3>预警严重等级</h3>
           </div>
-          <SeverityLevelChart :chartData="severityStats" />
+          <SeverityLevelChart :chartData="severityStats" :thresholds="warningThresholds" />
+        </div>
+        <div class="card health-status-card">
+            <div class="card-header">
+                <i class="fas fa-heartbeat"></i>
+                <h3>茶园健康状态</h3>
+            </div>
+            <HealthStatusChart :chartData="healthStats" />
         </div>
         <div class="card quick-actions-card">
           <div class="card-header">
@@ -233,6 +240,7 @@ import SeverityLevelChart from './components/prediction/SeverityLevelChart.vue';
 import DetectionTrendChart from './components/prediction/DetectionTrendChart.vue';
 import LeafGradeChart from './components/prediction/LeafGradeChart.vue';
 import UserRankingChart from './components/prediction/UserRankingChart.vue';
+import HealthStatusChart from './components/prediction/HealthStatusChart.vue';
 import Modal from '../components/common/Modal.vue';
 
 export default {
@@ -244,6 +252,7 @@ export default {
     DetectionTrendChart,
     LeafGradeChart,
     UserRankingChart,
+    HealthStatusChart,
     Modal,
   },
   setup() {
@@ -251,6 +260,8 @@ export default {
     const userDetections = ref([]);
     const pestDistribution = ref([]);
     const severityStats = ref([]);
+    const warningThresholds = ref({ critical: 0, high: 0, medium: 0 });
+    const healthStats = ref([]);
     const leafGradeStats = ref([]);
     const pestTotal = ref(0);
     const leafGradeTotal = ref(0);
@@ -281,7 +292,8 @@ export default {
         pestTotal.value = pestDistributionRes.data.total;
 
         const severityStatsRes = await axios.get('http://localhost:3000/api/severity-stats');
-        severityStats.value = severityStatsRes.data;
+        severityStats.value = severityStatsRes.data.stats;
+        warningThresholds.value = severityStatsRes.data.thresholds;
         
         const trendRes = await axios.get('http://localhost:3000/api/detection-trend');
         detectionTrend.value = trendRes.data;
@@ -289,6 +301,9 @@ export default {
         const leafGradeRes = await axios.get('http://localhost:3000/api/leaf-grade-stats');
         leafGradeStats.value = leafGradeRes.data.stats;
         leafGradeTotal.value = leafGradeRes.data.total;
+
+        const healthStatsRes = await axios.get('http://localhost:3000/api/health-stats');
+        healthStats.value = healthStatsRes.data;
 
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -378,7 +393,7 @@ export default {
       if (format === 'csv') {
         reportContent = "预警名称,预警等级,发生区域,发生时间,处理建议\n";
         pestWarnings.value.forEach(w => {
-          reportContent += `"${w.name}","${w.level}","${w.area}","${w.time}","${w.suggestion.replace(/"/g, '""')}"\n`;
+          reportContent += `"${w.name}","${w.level}","${w.area}","${w.time}","${(w.suggestion || '').replace(/"/g, '""')}"\n`;
         });
         fileExtension = 'csv';
         mimeType = 'text/csv;charset=utf-8';
@@ -471,6 +486,8 @@ export default {
       expandedSuggestionId,
       toggleSuggestion,
       stripMarkdown,
+      warningThresholds,
+      healthStats,
     };
   }
 }
@@ -548,8 +565,18 @@ export default {
   color: #aaccdd;
 }
 
-.warning-list-card, .user-ranking-card, .trend-chart-card, .pest-distribution-chart-card, .severity-chart-card, .quick-actions-card {
+.warning-list-card, .user-ranking-card, .trend-chart-card, .pest-distribution-chart-card {
   flex: 1;
+}
+
+.severity-chart-card {
+    flex: 2;
+}
+.health-status-card {
+    flex: 2;
+}
+.quick-actions-card {
+    flex: 1.2;
 }
 
 .warning-list {
@@ -608,6 +635,7 @@ export default {
       }
       display: -webkit-box;
       -webkit-line-clamp: 2;
+      line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -616,6 +644,7 @@ export default {
 
       &.expanded {
         -webkit-line-clamp: unset;
+        line-clamp: unset;
         white-space: pre-wrap;
       }
     }
