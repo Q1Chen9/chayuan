@@ -25,6 +25,7 @@
     "fs": "0.0.1-security",
     "gsap": "^3.11.4",
     "mysql2": "^3.14.2",
+    "node-fetch": "^3.3.2",
     "postcss": "^8.4.21",
     "postcss-loader": "^7.0.2",
     "postcss-pxtorem": "^6.0.0",

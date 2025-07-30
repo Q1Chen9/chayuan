@@ -1,5 +1,12 @@
 <template>
   <div class="realtime-data">
+    <div
+      v-if="dragging.tooltip.visible"
+      class="drag-tooltip"
+      :style="{ top: dragging.tooltip.y + 'px', left: dragging.tooltip.x + 'px' }"
+    >
+      {{ dragging.tooltip.content }}
+    </div>
     <div class="data-grid">
       <div class="data-card" v-for="(item, index) in dataItems" :key="index">
         <div class="card-icon" :class="item.class">
@@ -22,11 +29,11 @@
           </div>
           
           <div class="card-extras">
-            <div class="status-bar">
+            <div class="status-bar" :ref="el => setStatusBarRef(el, item.title)">
               <div class="status" :style="{ width: getPercentage(item) + '%', background: getStatusColor(item) }"></div>
               <div class="range-markers">
-                <div class="marker marker-warning" :style="{ left: getMarkerPosition(item, 'warning') + '%' }"></div>
-                <div class="marker marker-danger" :style="{ left: getMarkerPosition(item, 'danger') + '%' }"></div>
+                <div class="marker marker-warning" :style="{ left: getMarkerPosition(item, 'warning') + '%' }" @mousedown="handleMouseDown($event, item, 'warning')"></div>
+                <div class="marker marker-danger" :style="{ left: getMarkerPosition(item, 'danger') + '%' }" @mousedown="handleMouseDown($event, item, 'danger')"></div>
               </div>
             </div>
             <div class="card-info" v-if="item.info">{{ item.info }}</div>
@@ -61,6 +68,83 @@ const props = defineProps({
     default: null
   }
 });
+
+const statusBarRefs = ref({});
+
+const setStatusBarRef = (el, title) => {
+  if (el) {
+    statusBarRefs.value[title] = el;
+  }
+};
+
+const dragging = ref({
+  isDragging: false,
+  item: null,
+  type: null,
+  tooltip: {
+    visible: false,
+    content: '',
+    x: 0,
+    y: 0,
+  }
+});
+
+function handleMouseDown(event, item, type) {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  
+  dragging.value = {
+    isDragging: true,
+    item: item,
+    type: type,
+    tooltip: {
+        visible: true,
+        content: item[type].toFixed(1),
+        x: event.clientX,
+        y: event.clientY,
+    }
+  };
+
+  window.addEventListener('mousemove', handleMouseMove);
+  window.addEventListener('mouseup', handleMouseUp);
+}
+
+function handleMouseMove(event) {
+  if (!dragging.value.isDragging) return;
+
+  const { item, type } = dragging.value;
+  const statusBar = statusBarRefs.value[item.title];
+  
+  if (!statusBar) return;
+  
+  const rect = statusBar.getBoundingClientRect();
+  const mouseX = event.clientX - rect.left;
+  const percent = Math.max(0, Math.min(100, (mouseX / rect.width) * 100));
+  
+  let newValue = item.min + (percent / 100) * (item.max - item.min);
+
+  if (type === 'warning') {
+    if (newValue > item.danger) {
+      newValue = item.danger;
+    }
+  } else { // danger
+    if (newValue < item.warning) {
+      newValue = item.warning;
+    }
+  }
+  
+  item[type] = parseFloat(newValue.toFixed(1));
+  dragging.value.tooltip.content = item[type].toFixed(1);
+  dragging.value.tooltip.x = event.clientX;
+  dragging.value.tooltip.y = event.clientY;
+}
+
+function handleMouseUp() {
+  dragging.value.isDragging = false;
+  dragging.value.tooltip.visible = false;
+  window.removeEventListener('mousemove', handleMouseMove);
+  window.removeEventListener('mouseup', handleMouseUp);
+}
 
 const currentTime = ref(formatTime(new Date()));
 const weatherDescription = ref('晴朗 23°C');
@@ -470,6 +554,20 @@ const getStatusText = (item) => {
 </script>
 
 <style lang="scss" scoped>
+.drag-tooltip {
+  position: fixed;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 9999;
+  white-space: nowrap;
+  transform: translate(-50%, -150%);
+  transition: opacity 0.2s;
+}
+
 .realtime-data {
   width: 100%;
   height: 100%;
@@ -659,20 +757,24 @@ const getStatusText = (item) => {
               left: 0;
               width: 100%;
               height: 100%;
-              pointer-events: none;
               
               .marker {
                 position: absolute;
-                top: 0;
-                height: 100%;
-                width: 1px;
+                top: 50%;
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                border: 2px solid white;
+                transform: translate(-50%, -50%);
+                cursor: ew-resize;
+                z-index: 10;
                 
                 &.marker-warning {
-                  background: rgba(255, 186, 90, 0.7);
+                  background: #FFBA5A;
                 }
                 
                 &.marker-danger {
-                  background: rgba(255, 83, 112, 0.7);
+                  background: #FF5370;
                 }
               }
             }

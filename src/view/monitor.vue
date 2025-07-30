@@ -109,7 +109,7 @@ async function fetchLocationId(lat, lon) {
     return data.location[0].id;
   }
   throw new Error('获取城市ID失败');
-}
+} 
 
 // 获取实时天气
 async function fetchWeatherNow(locationId) {

@@ -13,7 +13,7 @@
             <div class="step-title">采摘</div>
           </div>
           <div class="step-content">
-            <div class="data-row">
+            <div class="data-grid">
               <div class="data-card">
                 <div class="card-icon">
                   <i class="fas fa-weight-scale"></i>
@@ -30,6 +30,24 @@
                 <div class="card-content">
                   <div class="data-value">128 kg</div>
                   <div class="data-label">今日采摘重量</div>
+                </div>
+              </div>
+              <div class="data-card">
+                <div class="card-icon">
+                    <i class="fas fa-leaf"></i>
+                </div>
+                <div class="card-content">
+                    <div class="data-value">97.5%</div>
+                    <div class="data-label">鲜叶合格率</div>
+                </div>
+              </div>
+              <div class="data-card">
+                  <div class="card-icon">
+                      <i class="fas fa-tachometer-alt"></i>
+                  </div>
+                  <div class="card-content">
+                      <div class="data-value">12.5 kg/h</div>
+                      <div class="data-label">平均采摘效率</div>
                 </div>
               </div>
             </div>
@@ -66,7 +84,7 @@
             <div class="step-title">摊青</div>
           </div>
           <div class="step-content">
-            <div class="data-row">
+            <div class="data-grid">
               <div class="data-card">
                 <div class="card-icon">
                   <i class="fas fa-temperature-low"></i>
@@ -85,8 +103,6 @@
                   <div class="data-label">平均摊青时间</div>
                 </div>
               </div>
-            </div>
-            <div class="data-row">
               <div class="data-card">
                 <div class="card-icon">
                   <i class="fas fa-scale-balanced"></i>
@@ -129,7 +145,7 @@
             <div class="step-title">杀青</div>
           </div>
           <div class="step-content">
-            <div class="data-row">
+            <div class="data-grid">
               <div class="data-card">
                 <div class="card-icon">
                   <i class="fas fa-temperature-high"></i>
@@ -148,8 +164,6 @@
                   <div class="data-label">杀青时间</div>
                 </div>
               </div>
-            </div>
-            <div class="data-row">
               <div class="data-card">
                 <div class="card-icon">
                   <i class="fas fa-weight-hanging"></i>
@@ -192,7 +206,7 @@
             <div class="step-title">回潮</div>
           </div>
           <div class="step-content">
-            <div class="data-row">
+            <div class="data-grid">
               <div class="data-card">
                 <div class="card-icon">
                   <i class="fas fa-thermometer-half"></i>
@@ -211,8 +225,6 @@
                   <div class="data-label">环境湿度</div>
                 </div>
               </div>
-            </div>
-            <div class="data-row">
               <div class="data-card">
                 <div class="card-icon">
                   <i class="fas fa-scale-balanced"></i>
@@ -255,7 +267,7 @@
             <div class="step-title">辉锅</div>
           </div>
           <div class="step-content">
-            <div class="data-row">
+            <div class="data-grid">
               <div class="data-card">
                 <div class="card-icon">
                   <i class="fas fa-temperature-arrow-up"></i>
@@ -274,8 +286,6 @@
                   <div class="data-label">炒制时间</div>
                 </div>
               </div>
-            </div>
-            <div class="data-row">
               <div class="data-card">
                 <div class="card-icon">
                   <i class="fas fa-weight-scale"></i>
@@ -318,7 +328,7 @@
             <div class="step-title">包装</div>
           </div>
           <div class="step-content">
-            <div class="data-row">
+            <div class="data-grid">
               <div class="data-card">
                 <div class="card-icon">
                   <i class="fas fa-box-open"></i>
@@ -337,23 +347,6 @@
                   <div class="data-label">今日包装数量</div>
                 </div>
               </div>
-            </div>
-            <div class="grade-distribution">
-              <div class="list-header">
-                <i class="fas fa-ranking-star"></i>
-                <div class="grade-title">茶叶分级数量</div>
-              </div>
-              <div class="grade-row">
-                <div class="grade-item" v-for="(grade, index) in gradeData" :key="index">
-                  <div class="grade-name">{{ grade.name }}</div>
-                  <div class="grade-bar">
-                    <div class="bar-value" :style="{ width: (grade.value / maxGradeValue * 100) + '%', background: getGradeColor(index) }"></div>
-                  </div>
-                  <div class="grade-value">{{ grade.value }} kg</div>
-                </div>
-              </div>
-            </div>
-            <div class="data-row">
               <div class="data-card">
                 <div class="card-icon">
                   <i class="fas fa-gauge-high"></i>
@@ -370,6 +363,30 @@
                 <div class="card-content">
                   <div class="data-value">98.5%</div>
                   <div class="data-label">质检合格率</div>
+                </div>
+              </div>
+              <div class="data-card">
+                  <div class="card-icon">
+                      <i class="fas fa-box"></i>
+                  </div>
+                  <div class="card-content">
+                      <div class="data-value">0.8%</div>
+                      <div class="data-label">包装破损率</div>
+                  </div>
+              </div>
+            </div>
+            <div class="grade-distribution">
+              <div class="list-header">
+                <i class="fas fa-ranking-star"></i>
+                <div class="grade-title">茶叶分级数量</div>
+              </div>
+              <div class="grade-row">
+                <div class="grade-item" v-for="(grade, index) in gradeData" :key="index">
+                  <div class="grade-name">{{ grade.name }}</div>
+                  <div class="grade-bar">
+                    <div class="bar-value" :style="{ width: (grade.value / maxGradeValue * 100) + '%', background: getGradeColor(index) }"></div>
+                  </div>
+                  <div class="grade-value">{{ grade.value }} kg</div>
                 </div>
               </div>
             </div>
@@ -646,6 +663,13 @@ export default {
       &::-webkit-scrollbar-thumb {
         background: rgba(71, 200, 255, 0.5);
         border-radius: 2px;
+      }
+      
+      .data-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-bottom: 15px;
       }
       
       .data-row {

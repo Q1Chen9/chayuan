@@ -1,9 +1,10 @@
 <script setup>
-
+import AIAssistant from './components/AIAssistant.vue'
 </script>
 
 <template>
   <router-view/>
+  <AIAssistant />
 </template>
 
 <style lang="scss">

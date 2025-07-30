@@ -2,6 +2,13 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 
+// 动态导入node-fetch
+let fetch;
+(async () => {
+  const nodeFetch = await import('node-fetch');
+  fetch = nodeFetch.default;
+})();
+
 const app = express();
 const port = 3000;
 
@@ -15,6 +22,87 @@ const db = mysql.createConnection({
   database: 'yolodatabase', // Changed database name
   multipleStatements: true
 });
+
+// AI聊天接口 - 调用DeepSeek API
+app.post('/api/ai-chat', async (req, res) => {
+    try {
+        const { message } = req.body;
+        
+        if (!message) {
+            return res.status(400).json({ error: '消息内容不能为空' });
+        }
+        
+        // 检查fetch是否可用，如果不可用则直接使用备用回复
+        if (!fetch) {
+            console.log('fetch未初始化，使用备用回复');
+            const fallbackResponse = generateFallbackResponse(message);
+            return res.json({ response: fallbackResponse });
+        }
+        
+        // 调用DeepSeek API
+        const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer sk-6bdf146e7b644c0190520366b8d1b421' // 请替换为实际的API密钥
+            },
+            body: JSON.stringify({
+                model: 'deepseek-chat',
+                messages: [
+                    {
+                        role: 'system',
+                        content: '你是一个专业的茶园管理AI助手，专门帮助用户分析茶园数据、诊断茶叶病虫害、优化生产管理。请用专业但易懂的语言回答问题，并提供实用的建议。'
+                    },
+                    {
+                        role: 'user',
+                        content: message
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 1000
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`DeepSeek API错误: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const aiResponse = data.choices[0].message.content;
+        
+        res.json({ response: aiResponse });
+        
+    } catch (error) {
+        console.error('AI聊天接口错误:', error);
+        
+        // 如果API调用失败，返回一个默认的智能回复
+        const fallbackResponse = generateFallbackResponse(req.body.message || '');
+        res.json({ response: fallbackResponse });
+    }
+});
+
+// 生成备用回复（当DeepSeek API不可用时）
+function generateFallbackResponse(message) {
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('病虫害') || lowerMessage.includes('病害') || lowerMessage.includes('虫害')) {
+        return '根据您的问题，建议您：\n1. 定期检查茶叶叶片状况\n2. 保持适当的田间湿度\n3. 及时清理病虫害叶片\n4. 使用生物防治方法\n\n如需更详细的诊断，请上传相关图片进行AI检测。';
+    }
+    
+    if (lowerMessage.includes('产量') || lowerMessage.includes('生产')) {
+        return '关于茶园生产管理，建议：\n1. 合理安排采摘时间\n2. 控制采摘强度\n3. 加强肥水管理\n4. 注意天气变化影响\n\n您可以查看生产页面了解详细的生产数据分析。';
+    }
+    
+    if (lowerMessage.includes('环境') || lowerMessage.includes('监控')) {
+        return '环境监控是茶园管理的重要环节：\n1. 关注温湿度变化\n2. 监测土壤状况\n3. 注意空气质量\n4. 预防极端天气\n\n您可以在监控页面查看实时环境数据。';
+    }
+    
+    if (lowerMessage.includes('销售') || lowerMessage.includes('市场')) {
+        return '关于茶叶销售分析：\n1. 关注市场价格趋势\n2. 分析不同渠道表现\n3. 了解地域销售分布\n4. 优化库存管理\n\n建议查看销售页面获取详细的市场分析数据。';
+    }
+    
+    return '感谢您的咨询！作为茶园管理AI助手，我可以帮您：\n\n🌱 分析茶园健康状况\n🔍 诊断病虫害问题\n📊 解读生产数据\n📈 提供销售建议\n🌡️ 监控环境指标\n\n请告诉我您具体想了解哪方面的信息，或点击"分析当前页面"按钮，我会根据当前页面数据为您提供专业分析。';
+}
 
 db.connect(err => {
   if (err) {
@@ -91,6 +179,17 @@ db.connect(err => {
       \`label\` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
       PRIMARY KEY (\`id\`) USING BTREE
     ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
+
+    CREATE TABLE IF NOT EXISTS \`detection_tasks\` (
+      \`id\` int NOT NULL AUTO_INCREMENT,
+      \`name\` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+      \`area\` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+      \`type\` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+      \`assignedUser\` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+      \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`is_read\` tinyint(1) NOT NULL DEFAULT 0,
+      PRIMARY KEY (\`id\`)
+    ) ENGINE = InnoDB;
   `;
 
   db.query(createTablesSQL, (err) => {
@@ -161,7 +260,7 @@ app.get('/api/warnings', (req, res) => {
     const getCountsQuery = `
         SELECT label 
         FROM imgrecords 
-        WHERE label NOT LIKE '%健康%'
+        WHERE label NOT LIKE '%健康%' 
     `;
 
     db.query(getCountsQuery, (err, allLabelRecords) => {
@@ -184,9 +283,9 @@ app.get('/api/warnings', (req, res) => {
             }
             
             labels.forEach(label => {
-                if (label && label !== '健康') {
+            if (label && label !== '健康') {
                     diseaseCounts[label] = (diseaseCounts[label] || 0) + 1;
-                }
+            }
             });
         });
 
@@ -198,7 +297,7 @@ app.get('/api/warnings', (req, res) => {
         };
 
         // 3. Fetch the latest warnings from imgrecords, excluding '健康'
-        db.query("SELECT * FROM imgrecords WHERE label NOT LIKE '%健康%' ORDER BY id DESC LIMIT 30", (err, results) => {
+        db.query("SELECT * FROM imgrecords ORDER BY id DESC LIMIT 50", (err, results) => {
             if (err) {
                 return res.status(500).send('Error fetching warnings from imgrecords');
             }
@@ -211,7 +310,7 @@ app.get('/api/warnings', (req, res) => {
                     label = record.label;
                 }
 
-                if (!label) return null;
+                if (!label || label === '健康') return null;
 
                 const count = diseaseCounts[label] || 0;
 
@@ -226,7 +325,7 @@ app.get('/api/warnings', (req, res) => {
                 };
             }).filter(item => item !== null);
 
-            res.json(warnings);
+            res.json(warnings.slice(0, 30));
         });
     });
 });
@@ -374,7 +473,7 @@ app.get('/api/severity-stats', (req, res) => {
     const getLabelsQuery = `
         SELECT label
         FROM imgrecords 
-        WHERE label NOT LIKE '%健康%'
+        WHERE label NOT LIKE '%健康%' 
     `;
 
     db.query(getLabelsQuery, (err, allLabelRecords) => {
@@ -420,8 +519,8 @@ app.get('/api/severity-stats', (req, res) => {
 
         Object.values(diseaseCounts).forEach(count => {
             const level = getLevel(count);
-            if (stats[level]) {
-                stats[level].count++;
+                if (stats[level]) {
+                    stats[level].count++;
             }
         });
 
@@ -522,7 +621,17 @@ app.get('/api/health-stats', (req, res) => {
     });
 });
 
+app.get('/api/tasks', (req, res) => {
+    db.query('SELECT * FROM detection_tasks ORDER BY createdAt DESC', (err, results) => {
+        if (err) {
+            res.status(500).send('Error fetching tasks');
+            return;
+        }
+        res.json(results);
+    });
+});
+
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
-}); 
+});

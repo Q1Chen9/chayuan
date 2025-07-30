@@ -31,24 +31,6 @@
             </li>
           </ul>
         </div>
-        <div class="card user-ranking-card">
-          <div class="card-header">
-            <i class="fas fa-users"></i>
-            <h3>用户检测排行</h3>
-          </div>
-          <UserRankingChart :chartData="userDetections" />
-        </div>
-      </div>
-
-      <!-- Center Column -->
-      <div class="column center-column">
-        <div class="card trend-chart-card">
-          <div class="card-header">
-            <i class="fas fa-chart-line"></i>
-            <h3>近7日病虫害检测趋势</h3>
-          </div>
-          <DetectionTrendChart :chartData="detectionTrend" />
-        </div>
         <div class="card pest-distribution-chart-card">
           <div class="card-header">
             <i class="fas fa-chart-pie"></i>
@@ -56,12 +38,43 @@
             <div class="chart-totals">
               <span>病虫害总数: {{ pestTotal }}</span>
               <span>茶叶分级检测总数: {{ leafGradeTotal }}</span>
-            </div>
+          </div>
           </div>
           <div class="chart-row">
             <PestDistributionChart :chartData="pestDistribution" />
             <LeafGradeChart :chartData="leafGradeStats" />
           </div>
+        </div>
+      </div>
+
+      <!-- Center Column -->
+      <div class="column center-column">
+        <div class="card trend-chart-card" :class="{ 'collapsed': showTasks }">
+          <div class="card-header">
+            <i class="fas fa-chart-line"></i>
+            <h3>近7日病虫害检测趋势</h3>
+          </div>
+          <DetectionTrendChart :chartData="detectionTrend" v-if="!showTasks" />
+        </div>
+        <div class="card task-list-card">
+          <div class="card-header">
+                <i class="fas fa-tasks"></i>
+                <h3>监测任务</h3>
+                <button class="toggle-tasks-btn" @click="showTasks = !showTasks">
+                  {{ showTasks ? '收起' : '展开' }}
+                  <span v-if="unreadTasksCount > 0" class="task-badge">{{ unreadTasksCount }}</span>
+                </button>
+            </div>
+            <div class="task-list-container" v-if="showTasks">
+                <DetectionTask v-for="task in tasks" :key="task.id" :task="task" />
+          </div>
+          </div>
+        <div class="card user-ranking-card">
+          <div class="card-header">
+            <i class="fas fa-users"></i>
+            <h3>用户检测排行</h3>
+          </div>
+          <UserRankingChart :chartData="userDetections" />
         </div>
       </div>
 
@@ -241,6 +254,7 @@ import DetectionTrendChart from './components/prediction/DetectionTrendChart.vue
 import LeafGradeChart from './components/prediction/LeafGradeChart.vue';
 import UserRankingChart from './components/prediction/UserRankingChart.vue';
 import HealthStatusChart from './components/prediction/HealthStatusChart.vue';
+import DetectionTask from './components/prediction/DetectionTask.vue';
 import Modal from '../components/common/Modal.vue';
 
 export default {
@@ -253,6 +267,7 @@ export default {
     LeafGradeChart,
     UserRankingChart,
     HealthStatusChart,
+    DetectionTask,
     Modal,
   },
   setup() {
@@ -267,6 +282,8 @@ export default {
     const leafGradeTotal = ref(0);
     const activeModal = ref(null);
     const expandedSuggestionId = ref(null);
+    const tasks = ref([]);
+    const showTasks = ref(false);
     const newTask = ref({ name: '', area: '', type: '', assignedUser: '' });
     const warningSettings = ref({
       warningThresholds: { critical: 0, high: 0, medium: 0 },
@@ -277,6 +294,10 @@ export default {
     const detectionTrend = ref({
       labels: [],
       values: [],
+    });
+
+    const unreadTasksCount = computed(() => {
+        return tasks.value.filter(task => !task.is_read).length;
     });
 
     const fetchData = async () => {
@@ -304,6 +325,9 @@ export default {
 
         const healthStatsRes = await axios.get('http://localhost:3000/api/health-stats');
         healthStats.value = healthStatsRes.data;
+
+        const tasksRes = await axios.get('http://localhost:3000/api/tasks');
+        tasks.value = tasksRes.data;
 
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -488,6 +512,9 @@ export default {
       stripMarkdown,
       warningThresholds,
       healthStats,
+      tasks,
+      showTasks,
+      unreadTasksCount,
     };
   }
 }
@@ -510,10 +537,23 @@ export default {
   flex-grow: 1;
   display: grid;
   grid-template-columns: 3fr 5fr 3fr;
+  grid-template-rows: auto 1fr;
   gap: 15px;
   padding: 80px 15px 20px;
   margin-top: 20px;
   overflow: hidden;
+}
+
+.center-column {
+    grid-row: 1 / span 2;
+    display: grid;
+    grid-template-rows: min-content min-content 1fr;
+}
+
+.trend-chart-card.collapsed {
+    flex-grow: 0;
+    min-height: 80px; /* Adjust to header height */
+    transition: all 0.3s ease;
 }
 
 .column {
@@ -556,6 +596,71 @@ export default {
       flex-grow: 1;
     }
   }
+}
+
+.toggle-tasks-btn {
+  background-color: rgba(71, 200, 255, 0.2);
+  border: 1px solid rgba(71, 200, 255, 0.4);
+  color: #d5f1f8;
+  padding: 4px 12px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 13px;
+  margin-left: auto;
+  position: relative;
+  transition: background-color 0.3s;
+}
+
+.toggle-tasks-btn:hover {
+  background-color: rgba(71, 200, 255, 0.4);
+}
+
+.task-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #FF5370;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.task-list-card .task-list-container {
+  padding: 10px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.task-list-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.task-list-container::-webkit-scrollbar-track {
+  background: rgba(6, 30, 65, 0.5);
+  border-radius: 3px;
+}
+
+.task-list-container::-webkit-scrollbar-thumb {
+  background: rgba(71, 200, 255, 0.5);
+  border-radius: 3px;
+}
+
+.task-list-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 200, 255, 0.8);
+}
+
+.task-list-container {
+  padding: 0 10px 15px;
+  max-height: 200px;
+  overflow-y: auto;
+  border-bottom: 1px solid rgba(71, 200, 255, 0.2);
+  margin-bottom: 15px;
 }
 
 .chart-totals {

@@ -23,6 +23,11 @@
       
       <!-- 中栏 -->
       <div class="salesmainc">
+        <div class="item-goals">
+            <item name="销售目标进度" icon="icon-target" :duration="0.5" :delay="0">
+                <sales-goals></sales-goals>
+            </item>
+        </div>
         <div class="item1">
           <sales-indicators></sales-indicators>
         </div>
@@ -71,6 +76,7 @@ import WordCloud from "./components/sales-analysis/word-cloud.vue";
 import CustomerReviews from "./components/sales-analysis/customer-reviews.vue";
 import TopicDistribution from "./components/sales-analysis/topic-distribution.vue";
 import HotTopics from "./components/sales-analysis/hot-topics.vue";
+import SalesGoals from "./components/sales-analysis/sales-goals.vue";
 
 onMounted(() => {
   const wow = new WOW({
@@ -141,7 +147,7 @@ onMounted(() => {
 
   .salesmainc {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     flex-wrap: nowrap;
     flex-direction: column;
@@ -150,6 +156,30 @@ onMounted(() => {
     width: calc(56% - 60px);
     height: 100%;
     z-index: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 10px;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+    &::-webkit-scrollbar-track {
+      background: rgba(6, 30, 65, 0.5);
+      border-radius: 3px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(71, 200, 255, 0.5);
+      border-radius: 3px;
+    }
+     &::-webkit-scrollbar-thumb:hover {
+      background: rgba(71, 200, 255, 0.8);
+    }
+
+    .item-goals {
+        width: 100%;
+        margin-bottom: 15px;
+        flex-shrink: 0;
+    }
 
     .item1 {
       width: 100%;
@@ -161,12 +191,12 @@ onMounted(() => {
       align-content: flex-start;
       position: relative;
       margin-top: 10px;
+      flex-shrink: 0;
     }
 
     .item2 {
       width: 100%;
-      height: calc(100% - 390px);
-      margin-top: 40px;
+      margin-top: 15px;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -174,6 +204,8 @@ onMounted(() => {
       flex-direction: row;
       position: relative;
       align-content: flex-start;
+      flex-grow: 1;
+      min-height: 400px;
     }
   }
 

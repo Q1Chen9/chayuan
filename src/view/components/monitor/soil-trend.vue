@@ -38,8 +38,8 @@ const generateInitialData = () => {
   let lastMoisture = 45;
 
   for (let i = 6; i >= 0; i--) {
-    const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-    dates.push(`${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`);
+    const date = new Date(now.getTime() - i * 15 * 60 * 1000); // 每15分钟间隔
+    dates.push(`${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`);
     
     lastTemp += (Math.random() - 0.5) * 0.5;
     lastTemp = Math.max(18, Math.min(22, lastTemp));
@@ -54,7 +54,7 @@ const generateInitialData = () => {
 
 const updateData = () => {
   const newDate = new Date();
-  const newDateStr = `${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
+  const newDateStr = `${String(newDate.getHours()).padStart(2, '0')}:${String(newDate.getMinutes()).padStart(2, '0')}:${String(newDate.getSeconds()).padStart(2, '0')}`;
 
   if (soilData.value.dates[soilData.value.dates.length - 1] !== newDateStr) {
     soilData.value.dates.shift();
@@ -119,7 +119,11 @@ const updateChart = () => {
         }
       },
       axisLabel: {
-        color: '#d5f1f8'
+        color: '#d5f1f8',
+        // 显示为HH:mm:ss格式
+        formatter: function(value) {
+          return value; // 直接显示为时间格式
+        }
       }
     },
     yAxis: [{
@@ -239,13 +243,44 @@ const updateChart = () => {
   chart.value.setOption(option);
 };
 
+const playAlarm = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = 880;
+    g.gain.value = 0.2;
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.25);
+    o.onended = () => ctx.close();
+  } catch (e) {
+    // 忽略错误
+  }
+};
+
+const handleKeydown = (e) => {
+  if (e.key === 'g' || e.key === 'G') {
+    // 只提升当天湿度
+    const arr = soilData.value.moisture.slice();
+    arr[arr.length - 1] = Math.min(100, arr[arr.length - 1] + 10);
+    soilData.value.moisture = arr;
+    updateChart();
+    playAlarm();
+  }
+};
+
 onMounted(() => {
   initChart();
   window.addEventListener('resize', resizeChart);
+  window.addEventListener('keydown', handleKeydown);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeChart);
+  window.removeEventListener('keydown', handleKeydown);
   if (chart.value) {
     chart.value.dispose();
     chart.value = null;
