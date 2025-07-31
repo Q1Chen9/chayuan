@@ -12,6 +12,7 @@ const soilData = ref({
   temperature: [],
   moisture: []
 });
+const highMoistureCounter = ref(0); // 高湿度计数器
 
 const initChart = () => {
   const chartDom = document.querySelector('.soil-trend-chart');
@@ -66,8 +67,25 @@ const updateData = () => {
   newTemp = Math.max(18, Math.min(22, newTemp));
   
   let lastMoisture = soilData.value.moisture[soilData.value.moisture.length - 1];
-  let newMoisture = lastMoisture + (Math.random() - 0.5) * 5;
-  newMoisture = Math.max(30, Math.min(60, newMoisture));
+  let newMoisture;
+  
+  if (lastMoisture > 60) {
+    highMoistureCounter.value++;
+    // 当湿度高于60%时，减缓下降速率，并确保至少保持3个周期
+    if (highMoistureCounter.value < 3) {
+      // 前3个周期保持高湿度，轻微波动
+      newMoisture = lastMoisture + (Math.random() - 0.5) * 1;
+    } else {
+      // 3个周期后开始缓慢下降
+      newMoisture = lastMoisture + (Math.random() - 0.7) * 2; // 减缓下降速率
+    }
+  } else {
+    highMoistureCounter.value = 0; // 重置计数器
+    // 正常湿度范围内的随机变化
+    newMoisture = lastMoisture + (Math.random() - 0.5) * 3;
+  }
+  
+  newMoisture = Math.max(30, Math.min(70, newMoisture)); // 调整最大值以允许超过60%
 
   soilData.value.temperature.shift();
   soilData.value.temperature.push(parseFloat(newTemp.toFixed(1)));
@@ -207,10 +225,19 @@ const updateChart = () => {
       type: 'bar',
       yAxisIndex: 1,
       itemStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: 'rgba(35, 253, 192, 0.8)' },
-          { offset: 1, color: 'rgba(35, 253, 192, 0.1)' }
-        ]),
+        color: function(params) {
+          if (params.value > 60) {
+            return new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(255, 99, 99, 0.8)' },
+              { offset: 1, color: 'rgba(255, 99, 99, 0.1)' }
+            ]);
+          } else {
+            return new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(35, 253, 192, 0.8)' },
+              { offset: 1, color: 'rgba(35, 253, 192, 0.1)' }
+            ]);
+          }
+        },
         borderRadius: [4, 4, 0, 0]
       },
       barWidth: '40%',
@@ -295,4 +322,4 @@ onBeforeUnmount(() => {
   height: 100%;
   position: relative;
 }
-</style> 
+</style>

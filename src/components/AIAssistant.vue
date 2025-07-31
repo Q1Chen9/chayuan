@@ -4,17 +4,39 @@
     :style="{ left: position.x + 'px', top: position.y + 'px' }"
     @mousedown="startDrag"
     :class="{ dragging: isDragging, expanded: isExpanded }"
-  >
-    <!-- AI助手头像/图标 -->
-    <div class="ai-avatar" @click="toggleExpanded" :style="avatarStyle">
-      <div class="avatar-icon">
-        <i :class="currentAvatar.icon" :style="{ color: currentAvatar.color }"></i>
+
+    >
+    <!-- AI助手虚拟形象 -->
+    <div class="ai-avatar" @click="toggleExpanded" :class="{ thinking: isThinking }">
+      <div class="virtual-character">
+        <img 
+          v-if="currentCharacter.type === 'image'"
+          :src="currentCharacter.src" 
+          :alt="currentCharacter.name"
+          class="character-image"
+          :class="{ animated: isThinking }"
+        />
+        <div 
+          v-else
+          class="character-fallback"
+          :class="{ animated: isThinking }"
+        >
+          <i :class="currentCharacter.icon" :style="{ color: currentCharacter.color }"></i>
+        </div>
       </div>
       <div class="status-indicator" :class="{ active: isThinking }"></div>
+      <!-- 文件上传区域（隐藏） -->
+      <input 
+        ref="fileInput" 
+        type="file" 
+        accept="image/*,.gif" 
+        @change="handleCharacterUpload" 
+        style="display: none;"
+      />
     </div>
     
     <!-- 自定义外观面板 -->
-      <div class="customization-panel" v-show="showCustomization && !isToolsCollapsed">
+      <div class="customization-panel" v-show="showCustomization">
         <div class="panel-header">
           <span>自定义外观</span>
           <button @click="showCustomization = false" class="close-panel-btn">
@@ -22,63 +44,56 @@
           </button>
         </div>
       <div class="custom-content">
-        <div class="avatar-options">
-          <h4>选择头像</h4>
-          <div class="avatar-grid">
+        <div class="character-options">
+          <h4>虚拟形象</h4>
+          <div class="character-upload">
+            <button @click="triggerFileUpload" class="upload-btn">
+              <i class="fas fa-upload"></i>
+              上传自定义形象
+            </button>
+            <p class="upload-tip">支持 PNG、JPG、GIF 格式</p>
+          </div>
+          <div class="character-grid">
             <div 
-              v-for="avatar in avatarOptions" 
-              :key="avatar.id"
-              class="avatar-option"
-              :class="{ active: currentAvatar.id === avatar.id }"
-              @click="selectAvatar(avatar)"
+              v-for="character in characterOptions" 
+              :key="character.id"
+              class="character-option"
+              :class="{ active: currentCharacter.id === character.id }"
+              @click="selectCharacter(character)"
             >
-              <i :class="avatar.icon" :style="{ color: avatar.color }"></i>
+              <img 
+                v-if="character.type === 'image'"
+                :src="character.src" 
+                :alt="character.name"
+                class="character-preview"
+              />
+              <div v-else class="character-icon">
+                <i :class="character.icon" :style="{ color: character.color }"></i>
+              </div>
+              <span class="character-name">{{ character.name }}</span>
             </div>
           </div>
         </div>
         
-        <div class="color-options">
-          <h4>背景颜色</h4>
-          <div class="color-grid">
-            <div 
-              v-for="color in backgroundColors" 
-              :key="color.name"
-              class="color-option"
-              :class="{ active: currentBackground === color.gradient }"
-              :style="{ background: color.gradient }"
-              @click="selectBackground(color.gradient)"
-            ></div>
-          </div>
-        </div>
-        
-        <div class="transparency-options">
-          <h4>背景透明度</h4>
-          <div class="transparency-control">
-            <span class="transparency-label">{{ Math.round(backgroundOpacity * 100) }}%</span>
-            <input 
-              type="range" 
-              min="0.1" 
-              max="1" 
-              step="0.1" 
-              v-model="backgroundOpacity"
-              @input="updateBackgroundOpacity"
-              class="transparency-slider"
-            />
-          </div>
-        </div>
-        
-        <div class="custom-color-options">
-          <h4>自定义颜色</h4>
-          <div class="custom-color-control">
-            <input 
-              type="color" 
-              v-model="customColor"
-              @input="updateCustomColor"
-              class="color-picker"
-            />
-            <button @click="applyCustomColor" class="apply-color-btn">
-              应用自定义颜色
-            </button>
+        <div class="animation-options">
+          <h4>动画设置</h4>
+          <div class="animation-controls">
+            <label class="animation-toggle">
+              <input 
+                type="checkbox" 
+                v-model="enableAnimation"
+                @change="updateAnimationSetting"
+              />
+              <span>启用思考动画</span>
+            </label>
+            <div class="animation-speed">
+              <label>动画速度</label>
+              <select v-model="animationSpeed" @change="updateAnimationSpeed">
+                <option value="slow">慢速</option>
+                <option value="normal">正常</option>
+                <option value="fast">快速</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -92,6 +107,10 @@
           <button @click="analyzeCurrentPage" class="analyze-btn" :disabled="isThinking">
             <i class="fas fa-chart-line"></i>
             分析当前页面
+          </button>
+          <button @click="stopThinking" class="stop-btn" v-show="isThinking">
+            <i class="fas fa-stop"></i>
+            停止思考
           </button>
           <button @click="toggleCustomization" class="customize-btn">
             <i class="fas fa-palette"></i>
@@ -218,12 +237,47 @@
       </div>
 
       <div class="chat-messages" ref="messagesContainer" v-show="!showHistory && !showTemplates">
+        <!-- 虚拟助手形象 -->
+        <div class="virtual-assistant" v-show="messages.length === 0">
+          <div class="assistant-avatar" :class="{ thinking: isThinking }">
+            <div class="avatar-face">
+              <div class="eyes">
+                <div class="eye left-eye">
+                  <div class="pupil" :style="eyeStyle"></div>
+                </div>
+                <div class="eye right-eye">
+                  <div class="pupil" :style="eyeStyle"></div>
+                </div>
+              </div>
+              <div class="mouth" :class="{ talking: isThinking }"></div>
+            </div>
+            <div class="avatar-glow"></div>
+          </div>
+          <div class="welcome-message">
+            <h3>你好！我是茶园智能助手</h3>
+            <p>我可以帮助您分析茶园数据、提供种植建议、预警病虫害等。有什么可以为您服务的吗？</p>
+          </div>
+        </div>
+        
         <div 
           v-for="(message, index) in messages" 
           :key="index" 
           class="message"
           :class="{ 'user-message': message.type === 'user', 'ai-message': message.type === 'ai' }"
         >
+          <!-- AI消息的虚拟形象 -->
+          <div class="message-avatar" v-if="message.type === 'ai'">
+            <div class="mini-assistant-avatar" :class="{ thinking: isThinking && index === messages.length - 1 }">
+              <div class="mini-avatar-face">
+                <div class="mini-eyes">
+                  <div class="mini-eye"></div>
+                  <div class="mini-eye"></div>
+                </div>
+                <div class="mini-mouth"></div>
+              </div>
+            </div>
+          </div>
+          
           <div class="message-content">
             <div class="message-text" v-html="formatMessage(message.content)"></div>
             <div class="message-time">{{ formatTime(message.timestamp) }}</div>
@@ -258,6 +312,7 @@
           <input 
             v-model="userInput" 
             @keyup.enter="sendMessage" 
+            @input="handleUserInput"
             placeholder="请输入您的问题..."
             :disabled="isThinking"
             class="message-input"
@@ -293,7 +348,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick, inject, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick, inject, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
@@ -305,6 +360,7 @@ const isExpanded = ref(false)
 const isThinking = ref(false)
 const userInput = ref('')
 const messages = ref([])
+const abortController = ref(null) // 用于中断API请求
 const messagesContainer = ref(null)
 const showCustomization = ref(false)
 const showQuickActions = ref(false)
@@ -315,8 +371,11 @@ const isListening = ref(false)
 const messageInput = ref(null)
 const chatHistory = ref([])
 const isToolsCollapsed = ref(false)
-const backgroundOpacity = ref(0.9)
-const customColor = ref('#006454')
+const enableAnimation = ref(true)
+const animationSpeed = ref('normal')
+const fileInput = ref(null)
+const mousePosition = ref({ x: 0, y: 0 })
+const isUserTyping = ref(false)
 const quickTemplates = ref([
   {
     id: 1,
@@ -346,58 +405,89 @@ const quickTemplates = ref([
 const commonEmojis = ref(['😊', '😂', '🤔', '👍', '👎', '❤️', '🎉', '😢', '😮', '🙏'])
 const recognition = ref(null)
 
-// 自定义外观相关
-const avatarOptions = ref([
-  { id: 1, icon: 'fas fa-user', color: '#ffffff', name: '用户' },
-  { id: 2, icon: 'fas fa-user-tie', color: '#ffffff', name: '商务人士' },
-  { id: 3, icon: 'fas fa-user-graduate', color: '#ffffff', name: '专家' },
-  { id: 4, icon: 'fas fa-user-ninja', color: '#ffffff', name: '忍者' },
-  { id: 5, icon: 'fas fa-user-astronaut', color: '#ffffff', name: '宇航员' },
-  { id: 6, icon: 'fas fa-user-secret', color: '#ffffff', name: '特工' },
-  { id: 7, icon: 'fas fa-child', color: '#ffffff', name: '儿童' },
-  { id: 8, icon: 'fas fa-baby', color: '#ffffff', name: '婴儿' },
-  { id: 9, icon: 'fas fa-male', color: '#ffffff', name: '男性' },
-  { id: 10, icon: 'fas fa-female', color: '#ffffff', name: '女性' }
+// 虚拟形象相关
+const characterOptions = ref([
+  { id: 1, type: 'icon', icon: 'fas fa-robot', color: '#4CAF50', name: '机器人' },
+  { id: 2, type: 'icon', icon: 'fas fa-user-astronaut', color: '#2196F3', name: '宇航员' },
+  { id: 3, type: 'icon', icon: 'fas fa-user-ninja', color: '#9C27B0', name: '忍者' },
+  { id: 4, type: 'icon', icon: 'fas fa-cat', color: '#FF9800', name: '小猫' },
+  { id: 5, type: 'icon', icon: 'fas fa-dragon', color: '#F44336', name: '小龙' },
+  { id: 6, type: 'icon', icon: 'fas fa-ghost', color: '#607D8B', name: '幽灵' },
+  { id: 7, type: 'icon', icon: 'fas fa-magic', color: '#E91E63', name: '魔法师' },
+  { id: 8, type: 'icon', icon: 'fas fa-leaf', color: '#4CAF50', name: '茶叶精灵' }
 ])
 
-const backgroundColors = ref([
-  { name: '茶园绿', gradient: 'linear-gradient(135deg, #006454 0%, #00a085 100%)' },
-  { name: '深绿', gradient: 'linear-gradient(135deg, #2d5a27 0%, #4a7c59 100%)' },
-  { name: '翠绿', gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' },
-  { name: '蓝绿', gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
-  { name: '森林绿', gradient: 'linear-gradient(135deg, #134e5e 0%, #71b280 100%)' },
-  { name: '薄荷绿', gradient: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)' },
-  { name: '橄榄绿', gradient: 'linear-gradient(135deg, #8fbc8f 0%, #556b2f 100%)' },
-  { name: '海绿', gradient: 'linear-gradient(135deg, #2e8b57 0%, #3cb371 100%)' }
-])
+const currentCharacter = ref(characterOptions.value[0])
 
-const currentAvatar = ref(avatarOptions.value[0])
-const currentBackground = ref('linear-gradient(135deg, #006454 0%, #00a085 100%)')
-
-// 计算头像样式
-const avatarStyle = computed(() => ({
-  background: currentBackground.value,
-  opacity: backgroundOpacity.value
-}))
-
-// 更新背景透明度
-const updateBackgroundOpacity = () => {
-  // 透明度已通过v-model自动更新
-  // 保存到本地存储
-  localStorage.setItem('ai-assistant-opacity', backgroundOpacity.value.toString())
+// 虚拟形象相关方法
+const selectCharacter = (character) => {
+  currentCharacter.value = character
+  localStorage.setItem('ai-assistant-character', JSON.stringify(character))
 }
 
-// 更新自定义颜色
-const updateCustomColor = () => {
-  // 颜色已通过v-model自动更新
+const triggerFileUpload = () => {
+  fileInput.value?.click()
 }
 
-// 应用自定义颜色
- const applyCustomColor = () => {
-   currentBackground.value = customColor.value
-   localStorage.setItem('ai-assistant-background', customColor.value)
-   localStorage.setItem('ai-assistant-custom-color', customColor.value)
- }
+const handleCharacterUpload = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const customCharacter = {
+        id: Date.now(),
+        type: 'image',
+        src: e.target.result,
+        name: '自定义形象'
+      }
+      characterOptions.value.push(customCharacter)
+      selectCharacter(customCharacter)
+    }
+    reader.readAsDataURL(file)
+  }
+}
+
+const updateAnimationSetting = () => {
+  localStorage.setItem('ai-assistant-animation', enableAnimation.value.toString())
+}
+
+const updateAnimationSpeed = () => {
+  localStorage.setItem('ai-assistant-animation-speed', animationSpeed.value)
+}
+
+// 虚拟助手交互功能
+const handleMouseMove = (event) => {
+  mousePosition.value = {
+    x: event.clientX,
+    y: event.clientY
+  }
+}
+
+const handleUserInput = () => {
+  isUserTyping.value = true
+  clearTimeout(window.typingTimer)
+  window.typingTimer = setTimeout(() => {
+    isUserTyping.value = false
+  }, 1000)
+}
+
+// 计算眼睛看向鼠标的角度
+const eyeStyle = computed(() => {
+  if (messages.value.length > 0) return {}
+  
+  const avatarCenter = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+  const deltaX = mousePosition.value.x - avatarCenter.x
+  const deltaY = mousePosition.value.y - avatarCenter.y
+  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+  const maxDistance = 100
+  
+  const moveX = Math.max(-4, Math.min(4, (deltaX / maxDistance) * 4))
+  const moveY = Math.max(-4, Math.min(4, (deltaY / maxDistance) * 4))
+  
+  return {
+    transform: `translate(${moveX}px, ${moveY}px)`
+  }
+})
 
 // 拖拽相关
 let dragOffset = { x: 0, y: 0 }
@@ -519,11 +609,21 @@ const analyzeCurrentPage = async () => {
     analysisPrompt += `\nAPI数据：\n${JSON.stringify(pageData.apiData, null, 2)}\n`
   }
   
-  analysisPrompt += `\n请根据以上信息提供专业的茶园管理数据分析和建议，包括：\n`
-  analysisPrompt += `1. 当前页面数据的关键指标分析\n`
-  analysisPrompt += `2. 发现的问题或异常情况\n`
-  analysisPrompt += `3. 改进建议和操作指导\n`
-  analysisPrompt += `4. 相关的茶园管理最佳实践`
+  // 根据页面类型提供专门的分析指导
+  if (pageData.page === '/monitor') {
+    analysisPrompt += `\n请根据以上环境监测数据提供专业的茶园环境分析和建议，包括：\n`
+    analysisPrompt += `1. 土壤环境状况分析（湿度、温度、养分等）\n`
+    analysisPrompt += `2. 空气质量和气候条件评估\n`
+    analysisPrompt += `3. 环境异常预警和风险识别\n`
+    analysisPrompt += `4. 环境优化建议和管理措施\n`
+    analysisPrompt += `5. 茶叶品质与环境因素的关联分析`
+  } else {
+    analysisPrompt += `\n请根据以上信息提供专业的茶园管理数据分析和建议，包括：\n`
+    analysisPrompt += `1. 当前页面数据的关键指标分析\n`
+    analysisPrompt += `2. 发现的问题或异常情况\n`
+    analysisPrompt += `3. 改进建议和操作指导\n`
+    analysisPrompt += `4. 相关的茶园管理最佳实践`
+  }
   
   messages.value.push({
     type: 'user',
@@ -575,13 +675,27 @@ const getCurrentPageData = async () => {
         console.warn('API数据获取失败，使用DOM数据:', apiError)
       }
     } else if (currentPath === '/monitor') {
-      // 监控页面数据
+      // 环境监测页面数据
       try {
-        const response = await fetch('http://localhost:3000/api/warnings')
-        const warnings = await response.json()
-        pageData.apiData = { warnings }
+        const responses = await Promise.all([
+          fetch('http://localhost:3000/api/environment-data'),
+          fetch('http://localhost:3000/api/soil-data'),
+          fetch('http://localhost:3000/api/air-quality'),
+          fetch('http://localhost:3000/api/warnings')
+        ])
+        
+        const [environmentData, soilData, airQuality, warnings] = await Promise.all(
+          responses.map(r => r.json().catch(() => null))
+        )
+        
+        pageData.apiData = {
+          environmentData,
+          soilData,
+          airQuality,
+          warnings
+        }
       } catch (apiError) {
-        console.warn('API数据获取失败，使用DOM数据:', apiError)
+        console.warn('环境数据获取失败，使用DOM数据:', apiError)
       }
     } else if (currentPath === '/production') {
       // 生产页面数据
@@ -628,7 +742,7 @@ const getPageName = (path) => {
   const pageNames = {
     '/': '首页',
     '/home': '首页',
-    '/monitor': '监测页面',
+    '/monitor': '环境监测页面',
     '/production': '生产页面',
     '/prediction': '预测页面',
     '/sales': '销售页面'
@@ -707,13 +821,17 @@ const extractPageDOMData = () => {
 const callDeepSeekAPI = async (prompt) => {
   isThinking.value = true
   
+  // 创建新的AbortController
+  abortController.value = new AbortController()
+  
   try {
     const response = await fetch('http://localhost:3000/api/ai-chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ message: prompt })
+      body: JSON.stringify({ message: prompt }),
+      signal: abortController.value.signal
     })
     
     if (!response.ok) {
@@ -729,14 +847,24 @@ const callDeepSeekAPI = async (prompt) => {
     })
     
   } catch (error) {
-    console.error('AI调用失败:', error)
-    messages.value.push({
-      type: 'ai',
-      content: '抱歉，AI服务暂时不可用，请稍后再试。',
-      timestamp: new Date()
-    })
+    if (error.name === 'AbortError') {
+      // 请求被中断
+      messages.value.push({
+        type: 'ai',
+        content: '思考已停止。',
+        timestamp: new Date()
+      })
+    } else {
+      console.error('AI调用失败:', error)
+      messages.value.push({
+        type: 'ai',
+        content: '抱歉，AI服务暂时不可用，请稍后再试。',
+        timestamp: new Date()
+      })
+    }
   } finally {
     isThinking.value = false
+    abortController.value = null
     nextTick(() => {
       scrollToBottom()
     })
@@ -761,48 +889,31 @@ const toggleCustomization = () => {
   showCustomization.value = !showCustomization.value
 }
 
-const selectAvatar = (avatar) => {
-  currentAvatar.value = avatar
-  // 保存到本地存储
-  localStorage.setItem('ai-assistant-avatar', JSON.stringify(avatar))
-}
-
-const selectBackground = (gradient) => {
-  currentBackground.value = gradient
-  // 保存到本地存储
-  localStorage.setItem('ai-assistant-background', gradient)
-}
-
 // 从本地存储加载自定义设置
 const loadCustomSettings = () => {
-  const savedAvatar = localStorage.getItem('ai-assistant-avatar')
-  const savedBackground = localStorage.getItem('ai-assistant-background')
+  const savedCharacter = localStorage.getItem('ai-assistant-character')
   const savedToolsCollapsed = localStorage.getItem('ai-assistant-tools-collapsed')
-  const savedOpacity = localStorage.getItem('ai-assistant-opacity')
-  const savedCustomColor = localStorage.getItem('ai-assistant-custom-color')
+  const savedAnimation = localStorage.getItem('ai-assistant-animation')
+  const savedAnimationSpeed = localStorage.getItem('ai-assistant-animation-speed')
   
-  if (savedAvatar) {
+  if (savedCharacter) {
     try {
-      currentAvatar.value = JSON.parse(savedAvatar)
+      currentCharacter.value = JSON.parse(savedCharacter)
     } catch (e) {
-      console.error('加载头像设置失败:', e)
+      console.error('加载虚拟形象设置失败:', e)
     }
   }
   
-  if (savedBackground) {
-    currentBackground.value = savedBackground
+  if (savedAnimation) {
+    enableAnimation.value = savedAnimation === 'true'
+  }
+  
+  if (savedAnimationSpeed) {
+    animationSpeed.value = savedAnimationSpeed
   }
   
   if (savedToolsCollapsed) {
     isToolsCollapsed.value = savedToolsCollapsed === 'true'
-  }
-  
-  if (savedOpacity) {
-    backgroundOpacity.value = parseFloat(savedOpacity)
-  }
-  
-  if (savedCustomColor) {
-    customColor.value = savedCustomColor
   }
 }
 
@@ -851,6 +962,14 @@ const addEmoji = (emoji) => {
   userInput.value += emoji
   showEmojiPicker.value = false
   messageInput.value?.focus()
+}
+
+// 停止思考功能
+const stopThinking = () => {
+  if (abortController.value) {
+    abortController.value.abort()
+    console.log('AI思考已被用户中断')
+  }
 }
 
 // 快捷操作
@@ -1005,12 +1124,25 @@ onMounted(() => {
   // 加载历史记录
   loadChatHistory()
   
+  // 添加鼠标移动监听器
+  document.addEventListener('mousemove', handleMouseMove)
+  
   // 添加欢迎消息
   messages.value.push({
     type: 'ai',
     content: '您好！我是您的AI智能助手，可以帮您分析茶园数据、回答问题。点击"分析当前页面"按钮，我可以为您分析当前页面的数据情况。您也可以点击"自定义"按钮来个性化我的外观！',
     timestamp: new Date()
   })
+})
+
+onUnmounted(() => {
+  // 移除事件监听器
+  document.removeEventListener('mousemove', handleMouseMove)
+  
+  // 清理定时器
+  if (window.typingTimer) {
+    clearTimeout(window.typingTimer)
+  }
 })
 </script>
 
@@ -1036,24 +1168,62 @@ onMounted(() => {
 .ai-avatar {
   width: 60px;
   height: 60px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
   position: relative;
+  background: transparent;
   
   &:hover {
     transform: scale(1.05);
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
   }
   
-  .avatar-icon {
-    color: white;
-    font-size: 24px;
+  &.thinking {
+    .virtual-character {
+      animation: bounce 1s infinite;
+    }
+  }
+  
+  .virtual-character {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    overflow: hidden;
+    
+    .character-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+      
+      &.animated {
+        animation: wiggle 0.8s infinite;
+      }
+    }
+    
+    .character-fallback {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+      border-radius: 50%;
+      
+      i {
+        font-size: 24px;
+      }
+      
+      &.animated {
+        animation: wiggle 0.8s infinite;
+      }
+    }
   }
   
   .status-indicator {
@@ -1120,6 +1290,23 @@ onMounted(() => {
       &:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+      }
+    }
+    
+    .stop-btn {
+      background: rgba(255, 87, 87, 0.8);
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.3s ease;
+      animation: pulse-red 1.5s infinite;
+      
+      &:hover {
+        background: rgba(255, 87, 87, 0.9);
+        transform: scale(1.05);
       }
     }
     
@@ -1226,11 +1413,14 @@ onMounted(() => {
   
   &.ai-message {
     justify-content: flex-start;
+    display: flex;
+    align-items: flex-start;
     
     .message-content {
       background: #f5f5f5;
       color: #333;
       border-radius: 18px 18px 18px 4px;
+      flex: 1;
     }
   }
 }
@@ -1685,8 +1875,204 @@ onMounted(() => {
   transform: translateY(-1px);
 }
 
-// 简化工具栏样式
- .mini-toolbar {
+// 虚拟助手形象样式
+  .virtual-assistant {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    text-align: center;
+  }
+  
+  .assistant-avatar {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    background: linear-gradient(135deg, #006454, #00a86b);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 32px rgba(0, 100, 84, 0.3);
+    transition: all 0.3s ease;
+  }
+  
+  .assistant-avatar.thinking {
+    animation: pulse 2s infinite;
+  }
+  
+  .avatar-face {
+    position: relative;
+    width: 80px;
+    height: 80px;
+  }
+  
+  .eyes {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+  }
+  
+  .eye {
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    position: relative;
+    animation: blink 4s infinite;
+  }
+  
+  .pupil {
+    width: 8px;
+    height: 8px;
+    background: #333;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: look-around 6s infinite;
+  }
+  
+  .mouth {
+    width: 20px;
+    height: 10px;
+    border: 2px solid white;
+    border-top: none;
+    border-radius: 0 0 20px 20px;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+  }
+  
+  .mouth.talking {
+    animation: talk 0.5s infinite alternate;
+  }
+  
+  .avatar-glow {
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(0, 100, 84, 0.2), rgba(0, 168, 107, 0.2));
+    animation: glow 3s infinite;
+    z-index: -1;
+  }
+  
+  .welcome-message {
+    max-width: 300px;
+  }
+  
+  .welcome-message h3 {
+    color: #006454;
+    margin-bottom: 10px;
+    font-size: 18px;
+  }
+  
+  .welcome-message p {
+    color: #666;
+    line-height: 1.5;
+    font-size: 14px;
+  }
+  
+  // 消息中的迷你虚拟形象
+  .message-avatar {
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+  
+  .mini-assistant-avatar {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #006454, #00a86b);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 100, 84, 0.2);
+    transition: all 0.3s ease;
+  }
+  
+  .mini-assistant-avatar.thinking {
+    animation: mini-pulse 1.5s infinite;
+  }
+  
+  .mini-avatar-face {
+    position: relative;
+    width: 24px;
+    height: 24px;
+  }
+  
+  .mini-eyes {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  
+  .mini-eye {
+    width: 4px;
+    height: 4px;
+    background: white;
+    border-radius: 50%;
+    animation: mini-blink 3s infinite;
+  }
+  
+  .mini-mouth {
+    width: 8px;
+    height: 4px;
+    border: 1px solid white;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    margin: 0 auto;
+  }
+  
+  // 动画效果
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+  
+  @keyframes mini-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+  
+  @keyframes blink {
+    0%, 90%, 100% { height: 16px; }
+    95% { height: 2px; }
+  }
+  
+  @keyframes mini-blink {
+    0%, 90%, 100% { height: 4px; }
+    95% { height: 1px; }
+  }
+  
+  @keyframes look-around {
+    0%, 100% { transform: translate(-50%, -50%); }
+    25% { transform: translate(-30%, -50%); }
+    50% { transform: translate(-50%, -30%); }
+    75% { transform: translate(-70%, -50%); }
+  }
+  
+  @keyframes talk {
+    0% { height: 10px; }
+    100% { height: 6px; }
+  }
+  
+  @keyframes glow {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.02); }
+  }
+  
+  @keyframes pulse-red {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+  }
+  
+  // 简化工具栏样式
+  .mini-toolbar {
    display: flex;
    justify-content: center;
    gap: 8px;
@@ -1922,6 +2308,153 @@ onMounted(() => {
   margin-top: 8px;
   opacity: 0;
   transition: opacity 0.3s ease;
+}
+
+// 虚拟形象相关样式
+.character-options {
+  .character-upload {
+    margin-bottom: 16px;
+    text-align: center;
+    
+    .upload-btn {
+      background: linear-gradient(135deg, #006454, #00a085);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 100, 84, 0.3);
+      }
+      
+      i {
+        margin-right: 6px;
+      }
+    }
+    
+    .upload-tip {
+      margin: 8px 0 0 0;
+      font-size: 12px;
+      color: #666;
+    }
+  }
+  
+  .character-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    
+    .character-option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: #f8f9fa;
+      
+      &:hover {
+        border-color: #006454;
+        background: #e8f5f3;
+      }
+      
+      &.active {
+        border-color: #006454;
+        background: linear-gradient(135deg, rgba(0, 100, 84, 0.1), rgba(0, 168, 107, 0.1));
+      }
+      
+      .character-preview {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-bottom: 6px;
+      }
+      
+      .character-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #4CAF50, #45a049);
+        margin-bottom: 6px;
+        
+        i {
+          font-size: 18px;
+        }
+      }
+      
+      .character-name {
+        font-size: 12px;
+        color: #333;
+        text-align: center;
+      }
+    }
+  }
+}
+
+.animation-options {
+  .animation-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    
+    .animation-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      
+      input[type="checkbox"] {
+        margin: 0;
+      }
+      
+      span {
+        font-size: 14px;
+        color: #333;
+      }
+    }
+    
+    .animation-speed {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      
+      label {
+        font-size: 14px;
+        color: #333;
+        min-width: 60px;
+      }
+      
+      select {
+        flex: 1;
+        padding: 4px 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+    }
+  }
+}
+
+// 动画定义
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
 }
 
 .message:hover .message-actions {

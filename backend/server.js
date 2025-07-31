@@ -631,6 +631,51 @@ app.get('/api/tasks', (req, res) => {
     });
 });
 
+// 环境数据API
+app.get('/api/environment', (req, res) => {
+    const environmentData = {
+        temperature: 22.5,
+        humidity: 65,
+        lightIntensity: 45000,
+        windSpeed: 2.3,
+        rainfall: 12.5,
+        uvIndex: 6,
+        timestamp: new Date().toISOString()
+    };
+    res.json(environmentData);
+});
+
+// 土壤数据API
+app.get('/api/soil', (req, res) => {
+    const soilData = {
+        soilMoisture: 45,
+        soilTemperature: 18.5,
+        ph: 6.2,
+        nitrogen: 85,
+        phosphorus: 42,
+        potassium: 78,
+        organicMatter: 3.2,
+        timestamp: new Date().toISOString()
+    };
+    res.json(soilData);
+});
+
+// 空气质量数据API
+app.get('/api/air-quality', (req, res) => {
+    const airQualityData = {
+        pm25: 35,
+        pm10: 58,
+        co2: 420,
+        o3: 85,
+        no2: 25,
+        so2: 8,
+        aqi: 72,
+        quality: '良好',
+        timestamp: new Date().toISOString()
+    };
+    res.json(airQualityData);
+});
+
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);

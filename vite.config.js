@@ -7,7 +7,8 @@ export default defineConfig({
         vue(),
     ],
     server: {
-        port: 8190   // 新的端口号
+        port: 8190,   // 新的端口号
+        host: '0.0.0.0'  // 允许局域网访问
     },
     base: link,
     resolve: {
